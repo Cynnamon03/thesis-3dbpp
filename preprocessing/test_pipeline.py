@@ -1,0 +1,235 @@
+"""
+Tests for the preprocessing pipeline.
+
+Run from the project root with:
+    python -m pytest preprocessing/test_pipeline.py -v
+"""
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import numpy as np
+import pytest
+
+from preprocessing.loader import parse_wtpack
+from preprocessing.fragility import assign_fragility
+from preprocessing.stop_assignment import assign_stops
+from preprocessing.pipeline import load_augmented_instance
+
+
+# ── Fixtures ─────────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope="module")
+def wtpack1_instances():
+    """Parse wtpack1 once and reuse across all tests in this module."""
+    return parse_wtpack("data/raw/wtpack1.txt")
+
+
+@pytest.fixture
+def fresh_instance(wtpack1_instances):
+    """Fresh copy of instance 0 so mutations in one test don't leak."""
+    inst = wtpack1_instances[0]
+    return {
+        "container": dict(inst["container"]),
+        "n_types": inst["n_types"],
+        "total_volume_m3": inst["total_volume_m3"],
+        "boxes": [dict(b) for b in inst["boxes"]],
+    }
+
+
+@pytest.fixture
+def minimal_config():
+    return {"data": {"raw_dir": "data/raw/"}}
+
+
+# ── Loader tests ─────────────────────────────────────────────────────────────
+
+class TestLoader:
+
+    def test_parses_100_instances(self, wtpack1_instances):
+        assert len(wtpack1_instances) == 100
+
+    def test_container_has_three_dimensions(self, wtpack1_instances):
+        for inst in wtpack1_instances[:5]:
+            assert set(inst["container"].keys()) == {"L", "W", "H"}
+            for v in inst["container"].values():
+                assert v > 0
+
+    def test_instance_has_expected_fields(self, wtpack1_instances):
+        inst = wtpack1_instances[0]
+        assert "container" in inst
+        assert "n_types" in inst
+        assert "total_volume_m3" in inst
+        assert "boxes" in inst
+
+    def test_n_types_matches_source(self, wtpack1_instances):
+        # wtpack1 has 3 box types per instance
+        for inst in wtpack1_instances:
+            assert inst["n_types"] == 3
+
+    def test_boxes_have_all_required_fields(self, wtpack1_instances):
+        required = {
+            "l", "w", "h",
+            "l_flag", "w_flag", "h_flag",
+            "mass", "lbs_l", "lbs_w", "lbs_h",
+            "allowed_orientations",
+        }
+        for box in wtpack1_instances[0]["boxes"]:
+            assert required.issubset(box.keys())
+
+    def test_box_dimensions_are_positive(self, wtpack1_instances):
+        for box in wtpack1_instances[0]["boxes"]:
+            assert box["l"] > 0
+            assert box["w"] > 0
+            assert box["h"] > 0
+
+    def test_allowed_orientations_nonempty(self, wtpack1_instances):
+        # At least one flag must be 1 for any valid box type
+        for box in wtpack1_instances[0]["boxes"]:
+            assert len(box["allowed_orientations"]) >= 2
+
+    def test_total_volume_matches_recomputed(self, wtpack1_instances):
+        # total_volume_m3 is the OR-Library's own check field.
+        # Sum of l*w*h*qty / 1e6 should be within rounding of it.
+        for inst in wtpack1_instances[:10]:
+            vol_cm3 = sum(b["l"] * b["w"] * b["h"] for b in inst["boxes"])
+            vol_m3 = vol_cm3 / 1e6
+            assert abs(vol_m3 - inst["total_volume_m3"]) < 0.01
+
+    def test_missing_file_raises(self):
+        with pytest.raises(FileNotFoundError):
+            parse_wtpack("data/raw/does_not_exist.txt")
+
+
+# ── Fragility tests ──────────────────────────────────────────────────────────
+
+class TestFragility:
+
+    def test_produces_exactly_25_percent_fragile(self, fresh_instance):
+        assign_fragility(fresh_instance["boxes"])
+        n = len(fresh_instance["boxes"])
+        n_fragile = sum(b["fragile"] for b in fresh_instance["boxes"])
+        assert n_fragile == round(n * 0.25)
+
+    def test_all_boxes_have_fragile_field(self, fresh_instance):
+        assign_fragility(fresh_instance["boxes"])
+        for box in fresh_instance["boxes"]:
+            assert "fragile" in box
+            assert box["fragile"] in (0, 1)
+
+    def test_fragile_boxes_have_lower_lbs(self, fresh_instance):
+        assign_fragility(fresh_instance["boxes"])
+        boxes = fresh_instance["boxes"]
+        fragile_lbs = [min(b["lbs_l"], b["lbs_w"], b["lbs_h"])
+                       for b in boxes if b["fragile"] == 1]
+        robust_lbs = [min(b["lbs_l"], b["lbs_w"], b["lbs_h"])
+                      for b in boxes if b["fragile"] == 0]
+        assert max(fragile_lbs) <= min(robust_lbs)
+
+    def test_empty_list_raises(self):
+        with pytest.raises(ValueError):
+            assign_fragility([])
+
+    def test_report_contains_expected_keys(self, fresh_instance):
+        report = assign_fragility(fresh_instance["boxes"])
+        for key in ("n_boxes", "fragile_count", "fragile_rate",
+                    "n_distinct_lbs", "lbs_min", "lbs_max",
+                    "lbs_ratio", "lbs_std", "q1"):
+            assert key in report
+
+
+# ── Stop assignment tests ────────────────────────────────────────────────────
+
+class TestStopAssignment:
+
+    def test_all_boxes_get_a_stop(self, fresh_instance):
+        assign_stops(fresh_instance["boxes"], num_stops=3, seed=42)
+        for box in fresh_instance["boxes"]:
+            assert "stop" in box
+            assert box["stop"] in (1, 2, 3)
+
+    def test_balance_within_10_percentage_points(self, fresh_instance):
+        assign_stops(fresh_instance["boxes"], num_stops=3, seed=42)
+        n = len(fresh_instance["boxes"])
+        counts = {1: 0, 2: 0, 3: 0}
+        for box in fresh_instance["boxes"]:
+            counts[box["stop"]] += 1
+        for s, c in counts.items():
+            assert abs(c / n - 1/3) <= 0.10
+
+    def test_reproducible_under_same_seed(self, fresh_instance):
+        assign_stops(fresh_instance["boxes"], num_stops=3, seed=42)
+        first = [b["stop"] for b in fresh_instance["boxes"]]
+
+        # Re-assign with same seed on a fresh copy
+        inst2_boxes = [dict(b) for b in fresh_instance["boxes"]]
+        for b in inst2_boxes:
+            b.pop("stop", None)
+        assign_stops(inst2_boxes, num_stops=3, seed=42)
+        second = [b["stop"] for b in inst2_boxes]
+
+        assert first == second
+
+    def test_different_seeds_differ(self, fresh_instance):
+        boxes_a = [dict(b) for b in fresh_instance["boxes"]]
+        boxes_b = [dict(b) for b in fresh_instance["boxes"]]
+        assign_stops(boxes_a, num_stops=3, seed=42)
+        assign_stops(boxes_b, num_stops=3, seed=99)
+        stops_a = [b["stop"] for b in boxes_a]
+        stops_b = [b["stop"] for b in boxes_b]
+        assert stops_a != stops_b
+
+    def test_too_few_boxes_raises(self):
+        boxes = [{"l": 10, "w": 10, "h": 10} for _ in range(2)]
+        with pytest.raises(ValueError):
+            assign_stops(boxes, num_stops=3, seed=42)
+
+    def test_invalid_num_stops_raises(self, fresh_instance):
+        with pytest.raises(ValueError):
+            assign_stops(fresh_instance["boxes"], num_stops=1, seed=42)
+
+    def test_empty_list_raises(self):
+        with pytest.raises(ValueError):
+            assign_stops([], num_stops=3, seed=42)
+
+
+# ── Pipeline integration tests ───────────────────────────────────────────────
+
+class TestPipeline:
+
+    def test_load_augmented_instance_end_to_end(self, minimal_config):
+        inst = load_augmented_instance(minimal_config, instance_id=0)
+        assert "container" in inst
+        assert "boxes" in inst
+        assert "augmentation" in inst
+        assert "fragility" in inst["augmentation"]
+        assert "stops" in inst["augmentation"]
+
+    def test_every_box_has_full_attribute_set(self, minimal_config):
+        inst = load_augmented_instance(minimal_config, instance_id=0)
+        required = {
+            "l", "w", "h",
+            "l_flag", "w_flag", "h_flag",
+            "mass", "lbs_l", "lbs_w", "lbs_h",
+            "allowed_orientations",
+            "fragile", "stop",
+        }
+        for box in inst["boxes"]:
+            assert required.issubset(box.keys())
+
+    def test_pipeline_is_deterministic(self, minimal_config):
+        a = load_augmented_instance(minimal_config, instance_id=0, stop_seed=42)
+        b = load_augmented_instance(minimal_config, instance_id=0, stop_seed=42)
+        stops_a = [box["stop"] for box in a["boxes"]]
+        stops_b = [box["stop"] for box in b["boxes"]]
+        assert stops_a == stops_b
+
+    def test_pipeline_works_across_all_seven_files(self, minimal_config):
+        # Sample one instance from each wtpack file
+        for instance_id in range(7):
+            inst = load_augmented_instance(minimal_config, instance_id=instance_id)
+            assert len(inst["boxes"]) > 0
+            n = len(inst["boxes"])
+            n_fragile = sum(b["fragile"] for b in inst["boxes"])
+            assert n_fragile == round(n * 0.25)
