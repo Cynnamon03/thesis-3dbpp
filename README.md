@@ -1,127 +1,56 @@
-# Constrained 3D Container Loading via GWO Hybridization
+# HGWO-MS3D / STACKR — Handoff: All Phases Completed
 
-**Thesis Project**: Polytechnic University of the Philippines  
-**Group 12**: Astejada, Bhasa, Gaa, Leñar
+Handoff document for the UI tab-shell, visual-polish, and database history integration. All phases (Phases 0–4) are **done, validated, and committed**.
 
----
-
-## Overview
-
-This tool implements and compares four algorithm configurations for solving the constrained multi-stop Three-Dimensional Bin Packing Problem (3D-BPP):
-
-1. **DGWO** — Discrete Grey Wolf Optimizer (standalone)
-2. **MOGWO** — Multi-Objective Grey Wolf Optimizer (standalone)
-3. **Sequential Hybrid** — DGWO → MOGWO (relay architecture)
-4. **Repair-Based Hybrid** — DGWO → Repair → MOGWO (pipeline architecture)
-
-The system evaluates solutions against six constraint families:
-- C1: Container boundary
-- C2: Non-overlap
-- C3: Weight capacity
-- C4: Fragility
-- C5: Static stability (≥80% base support)
-- C6: Stop-order accessibility (LIFO)
+Repo: `c:\Users\USER\Downloads\3d-bin-packing` · Node v22 · Windows
+Stack: React 19 + Three.js (client) · Express 5 + ws (server) · File-backed mock database (replacing better-sqlite3)
 
 ---
 
-## Project Structure
-thesis-3dbpp-tool/
-├── config/
-│ └── config.yaml # All algorithm parameters
-├── data/
-│ ├── raw/ # OR-Library wtpack files
-│ └── processed/ # Augmented records
-├── src/
-│ ├── algorithms/
-│ │ ├── base.py # Abstract base class
-│ │ ├── dgwo.py # Standalone DGWO
-│ │ ├── mogwo.py # Standalone MOGWO
-│ │ ├── sequential.py # Sequential Hybrid
-│ │ └── repair_based.py # Repair-Based Hybrid
-│ ├── constraints/
-│ │ ├── evaluator.py # C1–C6 constraint checks
-│ │ └── repair.py # R1–R5 repair operators
-│ ├── fitness/
-│ │ └── evaluator.py # OF-1, OF-2, PEN-1
-│ ├── metrics/
-│ │ └── collector.py # SU, CSR, ET, PM
-│ ├── preprocessing/
-│ │ ├── loader.py # OR-Library parser
-│ │ ├── fragility.py # Steps A1–A4
-│ │ └── stop_assignment.py # Steps B1–B3
-│ ├── statistics/
-│ │ └── analysis.py # Statistical tests
-│ ├── utils/
-│ │ ├── config.py # YAML loader
-│ │ └── logger.py # CSV logger
-│ └── visualization/
-│ ├── plot_3d.py # Plotly 3D diagrams
-│ └── convergence.py # Matplotlib curves
-├── experiments/
-│ └── runner.py # Main entry point
-├── notebooks/
-│ └── main.ipynb # Colab notebook
-├── results/
-│ └── logs/ # CSV output
-├── tests/
-│ └── test_loader.py # Unit tests
-├── requirements.txt
-├── LICENSE
-└── README.md
+## How to run the app (two terminals)
 
+**Terminal A — backend:**
+```powershell
+cd server
+npm install
+node index.js
+```
+Starts HTTP API on `:3001` and WebSocket on `:3002`. First run auto-creates `server/data/db_mock.json` holding users and run history.
+
+**Terminal B — frontend:**
+```powershell
+cd client
+npm install
+$env:BROWSER="none"
+npm start
+```
+Opens http://localhost:3000. Redirects to `/login`. Register an account, and land on `/app`.
 
 ---
 
-## Installation
+## ── COMPLETED PHASES ──
 
-### Local Installation
+### Phase 3 — Tab Shell & Structuring (COMPLETED)
+- **State Management**: Lifted the WebSocket client, streaming iteration updates, metrics compilation, and run states up into [Shell.jsx](file:///c:/Users/USER/Downloads/3d-bin-packing/client/src/Shell.jsx).
+- **Tab Layout**: Restructured the single-page application into four dedicated panels:
+  - **Logistics Setup**: Instance files selector, container specs, strategy picker, time limits, and the active Run button.
+  - **3-D Visualization**: Canvas viewport featuring active or final packing items, interactive playback animation sliders, speed select, and label controls.
+  - **Optimization Results**: Display of metric stat chips, progress indicators, and full convergence graphs.
+  - **Run History**: Local SQLite-compatible JSON history database logs.
+- **Researcher/Logistics Toggle**: A view switch in the Results tab that changes data representation from academic metrics ( composite scores, gap, dissipation) to operational metrics (pack order, constraints).
+- **Run Persistence**: Completed runs are automatically POSTed to `/api/auth/runs` to populate user logs.
 
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/thesis-3dbpp-tool.git
-cd thesis-3dbpp-tool
+### Phase 4 — Visual Polish & Feedback (COMPLETED)
+- **Premium Themes**: Implemented an HSL color-token-based Light and Dark theme toggle in the top header.
+- **Glassmorphic Auth**: Redesigned `/login` and `/register` views with a central glassmorphic look, including the new minimalist monogram logo.
+- **Card Framing**: Replaced all borderless components with solid outlines (`1px solid var(--border)`) to ensure panels have structured boundaries.
+- **Graph Expansion**: Placed the SVG Convergence Chart on a full-size dedicated panel card to eliminate clipping.
+- **Minimalist Logo**: Deployed a minimalist monogram logo constructed out of stacked blocks matching the name `STACKR`.
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+---
 
-# Install dependencies
-pip install -r requirements.txt
-
-Google Colab
-
-Open notebooks/main.ipynb in Colab and run the cells.
-Quick Start
-python
-
-from src.utils.config import load_config
-from experiments.runner import run_experiment
-
-# Load configuration
-config = load_config("config/config.yaml")
-
-# Run experiment (all 4 configs)
-log_path = run_experiment("config/config.yaml")
-print(f"Results saved to: {log_path}")
-
-Configuration
-
-All parameters are centralized in config/config.yaml:
-yaml
-
-algorithm:
-  population_size: 30
-  max_iterations: 500
-  archive_capacity: 100
-  sequential_split: [250, 250]
-
-penalty:
-  lambda_weight: 0.10
-  lambda_fragility: 0.10
-  lambda_balance: 0.10
-  lambda_access: 0.10
-
-experiment:
-  runs_per_config: 30
-  num_instances: 30
-  random_seed_base: 42
+## 🛠️ Resolved Decisions & Problems
+1. **Brand name**: Consistently locked to **STACKR**.
+2. **Theme Palette**: Defaults to **Light Mode** (mockup style), supporting **Dark Mode** via the `☀️`/`🌙` header toggle button.
+3. **Database Native Dependencies**: Swapped out compilation-heavy native module `better-sqlite3` with a pure JS database mock in `db.js`.
+4. **Invalid Dates**: Introduced a robust date parsing utility `formatDate` to handle both ISO and SQLite formats properly.

@@ -444,7 +444,7 @@ def hd_gwo_2d(items, container,
 
         # ── Optional live stream ──────────────────────────────────────────────
         if stream_cb:
-            stream_cb("iteration_update", {
+        stream_cb("iteration_update", {
             "iteration":        it + 1,
             "max_iter":         max_iter,
             "best_bins":        best.n_bins,
