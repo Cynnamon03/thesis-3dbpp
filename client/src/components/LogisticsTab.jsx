@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import Papa from "papaparse";
 
 export default function LogisticsTab({
   containerSpecs,
@@ -20,12 +21,11 @@ export default function LogisticsTab({
   itemsList,
   setItemsList,
   setIsCustomized,
+  instanceItems,
   loadingList,
   selected,
   setSelected,
   groupedInstances,
-  // NEW: instanceItems should be passed from parent — the parsed items from the selected OR-lib JSON
-  instanceItems = [],
   running,
   elapsed,
   handleStartRun,
@@ -38,7 +38,11 @@ export default function LogisticsTab({
 }) {
   const fileInputRef = useRef(null);
 
-  // New Item Input states (encapsulated locally)
+  // Wizard state
+  const [currentStep, setCurrentStep] = useState(1);
+  const [maxStepReached, setMaxStepReached] = useState(1);
+
+  // New Item Input states
   const [newItemId, setNewItemId] = useState("BOX-001");
   const [newItemL, setNewL] = useState("");
   const [newItemH, setNewH] = useState("");
@@ -48,562 +52,521 @@ export default function LogisticsTab({
   const [newItemType, setNewItemType] = useState("Standard");
   const [newItemStop, setNewItemStop] = useState("1");
 
-  // Keep newItemId updated based on itemsList length
   useEffect(() => {
     const nextNum = itemsList.length + 1;
     setNewItemId(`BOX-${String(nextNum).padStart(3, "0")}`);
   }, [itemsList]);
 
-  // Derived stats — based on active option
   const activeItems = activeOption === "A" ? itemsList : instanceItems;
 
-  const totalItemsCount = useMemo(() => {
-    return activeItems.reduce((sum, item) => sum + Number(item.Qty), 0);
-  }, [activeItems]);
+  const totalManualItems = itemsList.reduce((acc, it) => acc + (it.quantity || 1), 0);
+  const totalManualWeight = itemsList.reduce((acc, it) => acc + (it.weight * (it.quantity || 1)), 0);
 
-  const totalWeightSum = useMemo(() => {
-    const sum = activeItems.reduce(
-      (sum, item) => sum + Number(item.Weight || 0) * Number(item.Qty),
-      0
-    );
-    return parseFloat(sum.toFixed(1));
-  }, [activeItems]);
+  const totalInstanceItems = instanceItems.length;
+  const totalInstanceWeight = instanceItems.reduce((acc, it) => acc + (it.Weight || 0), 0);
 
-  const totalCategoriesCount = useMemo(() => {
-    const cats = new Set(activeItems.map((item) => item.Type));
-    return cats.size;
-  }, [activeItems]);
+  const handleContainerChange = (field, val) => {
+    setContainerSpecs(prev => ({ ...prev, [field]: Number(val) }));
+    setIsCustomized(true);
+  };
 
-  const handleAddItem = (e) => {
-    e.preventDefault();
-    if (!newItemL || !newItemH || !newItemD || !newItemQty) {
-      alert("Please fill in item dimensions (W, D, H) and Qty.");
-      return;
+  const handleMaxLoadChange = (val) => {
+    setMaxLoad(Number(val));
+    setIsCustomized(true);
+  };
+
+  const handleAddItem = () => {
+    if (!newItemL || !newItemH || !newItemD || !newItemWeight || !newItemQty) return;
+    const qty = parseInt(newItemQty, 10);
+    const stopVal = parseInt(newItemStop, 10);
+    for (let i = 0; i < qty; i++) {
+      const newItem = {
+        id: `${newItemId}-${i + 1}`,
+        length: Number(newItemL),
+        height: Number(newItemH),
+        depth: Number(newItemD),
+        weight: Number(newItemWeight),
+        Type: newItemType,
+        quantity: 1,
+        stop: stopVal,
+        LBS: newItemType === "Standard" ? Number(newItemWeight) * 10 : (newItemType === "Fragile" ? 0 : Number(newItemWeight) * 20),
+        fragile: newItemType === "Fragile" ? 1 : 0
+      };
+      setItemsList((prev) => [...prev, newItem]);
     }
-    const newBox = {
-      id: newItemId || `BOX-${String(itemsList.length + 1).padStart(3, "0")}`,
-      L: Number(newItemL),
-      H: Number(newItemH),
-      D: Number(newItemD),
-      Qty: Number(newItemQty),
-      Weight:
-        Number(newItemWeight) ||
-        parseFloat((10 + (itemsList.length * 3.5) % 15).toFixed(1)),
-      Type: newItemType,
-      Stop: Number(newItemStop) || 1
-    };
-    setItemsList([...itemsList, newBox]);
-    setIsCustomized(true);
-    setNewL("");
-    setNewH("");
-    setNewD("");
-    setNewWeight("");
-    setNewQty("1");
-    setNewItemStop("1");
-  };
-
-  const handleRemoveItem = (id) => {
-    setItemsList(itemsList.filter((it) => it.id !== id));
+    setNewL(""); setNewH(""); setNewD(""); setNewWeight(""); setNewQty("1"); setNewItemType("Standard"); setNewItemStop("1");
     setIsCustomized(true);
   };
 
-  const handleImportCSV = (e) => {
+  const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const text = evt.target.result;
-      const lines = text.split("\n");
-      const newItems = [];
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        const parts = line.split(",").map((p) => p.trim());
-        if (parts.length >= 4) {
-          const hasStop = parts.length >= 8;
-          const id = parts[0];
-          const stop = hasStop ? Number(parts[1]) : 1;
-          const lIdx = hasStop ? 2 : 1;
-          const hIdx = hasStop ? 3 : 2;
-          const dIdx = hasStop ? 4 : 3;
-          const qtyIdx = hasStop ? 5 : 4;
-          const typeIdx = hasStop ? 6 : 5;
-          const wtIdx = hasStop ? 7 : 6;
-          newItems.push({
-            id:
-              id ||
-              `BOX-${String(itemsList.length + newItems.length + 1).padStart(3, "0")}`,
-            Stop: isNaN(stop) ? 1 : stop,
-            L: Number(parts[lIdx]) || 0,
-            H: Number(parts[hIdx]) || 0,
-            D: Number(parts[dIdx]) || 0,
-            Qty: Number(parts[qtyIdx]) || 1,
-            Type: parts[typeIdx] || "Standard",
-            Weight: Number(parts[wtIdx]) || 10
-          });
-        }
-      }
-      if (newItems.length > 0) {
-        setItemsList([...itemsList, ...newItems]);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (res) => {
+        const parsed = res.data.map((r, i) => {
+          const type = r.Type || "Standard";
+          const weight = Number(r.Weight || r.weight || 0);
+          return {
+            id: r.Item_ID || `CSV-BOX-${i}`,
+            length: Number(r.Length || r.length || 0),
+            height: Number(r.Height || r.height || 0),
+            depth: Number(r.Depth || r.depth || 0),
+            weight: weight,
+            quantity: Number(r.Quantity || 1),
+            Type: type,
+            stop: Number(r.Stop || 1),
+            LBS: type === "Fragile" ? 0 : weight * 10,
+            fragile: type === "Fragile" ? 1 : 0
+          };
+        });
+        setItemsList((prev) => [...prev, ...parsed]);
         setIsCustomized(true);
-      }
-    };
-    reader.readAsText(file);
+      },
+    });
+    e.target.value = null;
   };
 
-  // Shared tab button style
-  const optionTabStyle = (opt) => ({
-    flex: 1,
-    padding: "12px 16px",
-    borderRadius: "8px",
-    border: activeOption === opt ? "2px solid var(--primary)" : "2px solid var(--border)",
-    background: activeOption === opt ? "var(--primary)" : "var(--bg-input)",
-    color: activeOption === opt ? "#ffffff" : "var(--text-muted)",
-    fontSize: "13px",
-    fontWeight: "700",
-    cursor: "pointer",
-    transition: "all 0.15s ease",
-    textAlign: "left",
-    display: "flex",
-    flexDirection: "column",
-    gap: "2px"
-  });
+  const handleClearManual = () => {
+    setItemsList([]);
+    setIsCustomized(true);
+  };
+
+  const handleClearInstance = () => {
+    setSelected("");
+    setIsCustomized(true);
+  };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const goToStep = (n) => {
+    setCurrentStep(n);
+    if (n > maxStepReached) setMaxStepReached(n);
+  };
+
+  const isStepDone = (n) => n < currentStep;
+  const isStepActive = (n) => n === currentStep;
+  const isStepClickable = (n) => n <= maxStepReached;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-      {/* Top row: Left sidebar + Right main panel */}
-      <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-start" }}>
-
-        {/* ── Left Sidebar ── */}
-        <div style={{ flex: "1 1 350px", display: "flex", flexDirection: "column", gap: "20px" }}>
-
-          {/* Container card */}
-          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
-            <h4
-              className="form-label"
-              style={{ color: "var(--primary)", borderBottom: "1px solid var(--border)", paddingBottom: "8px", marginBottom: "16px" }}
-            >
-              ● CONTAINER (BIN)
-            </h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
-                  Dimensions (cm) — Weight × Depth × Height
-                </label>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  {["L", "D", "H"].map((dim) => (
-                    <input
-                      key={dim}
-                      type="number"
-                      value={containerSpecs[dim]}
-                      onChange={(e) => {
-                        setContainerSpecs({ ...containerSpecs, [dim]: Number(e.target.value) });
-                        setIsCustomized(true);
-                      }}
-                      style={{ width: "33.3%", padding: "10px", border: "1px solid var(--border)", borderRadius: "6px", background: "var(--bg-input)", color: "var(--text-main)", fontSize: "14px", fontWeight: "600", outline: "none", textAlign: "center" }}
-                      disabled={running}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
-                  Max load capacity (kg)
-                </label>
-                <input
-                  type="number"
-                  value={maxLoad}
-                  onChange={(e) => { setMaxLoad(Number(e.target.value)); setIsCustomized(true); }}
-                  style={{ width: "100%", padding: "10px 14px", border: "1px solid var(--border)", borderRadius: "6px", background: "var(--bg-input)", color: "var(--text-main)", fontSize: "14px", fontWeight: "600", outline: "none" }}
-                  disabled={running}
-                />
-              </div>
-              <div className="dashed-preview">
-                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                  <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                  <line x1="12" y1="22.08" x2="12" y2="12" />
-                </svg>
-                <span>
-                  {containerSpecs.L} × {containerSpecs.D} × {containerSpecs.H} cm<br />
-                  {maxLoad.toLocaleString()} kg max load
-                </span>
-              </div>
+    <>
+      {/* Wizard step indicator */}
+      <div className="card" style={{ padding: "16px 20px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+          <div 
+            className={`wiz-step ${isStepActive(1) ? "active" : ""} ${isStepDone(1) ? "done" : ""}`} 
+            style={{ flex: 1, opacity: isStepClickable(1) ? 1 : 0.55, cursor: isStepClickable(1) ? "pointer" : "default" }}
+            onClick={() => isStepClickable(1) && goToStep(1)}
+          >
+            <div className="wiz-num">1</div>
+            <div>
+              <div className="wiz-label">Container</div>
+              <div className="wiz-sub">Bin dimensions &amp; load limit</div>
             </div>
           </div>
-
-          {/* Algorithm settings card */}
-          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
-            <h4
-              className="form-label"
-              style={{ color: "var(--primary)", borderBottom: "1px solid var(--border)", paddingBottom: "8px", marginBottom: "16px" }}
-            >
-              ● ALGORITHM SETTINGS
-            </h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>
-                  Algorithm strategy
-                </label>
-                <div style={{ display: "flex", gap: "6px" }}>
-                  {["DGWO", "MOGWO", "SEQ", "REP"].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setStrategy(s)}
-                      style={{
-                        flex: 1, padding: "8px 4px", borderRadius: "6px",
-                        border: "1px solid var(--border)",
-                        background: strategy === s ? "var(--primary)" : "var(--bg-input)",
-                        color: strategy === s ? "#ffffff" : "var(--text-muted)",
-                        fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.15s ease"
-                      }}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: "12px" }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Wolf pack size</label>
-                  <input type="number" value={wolfSize} onChange={(e) => setWolfSize(Number(e.target.value))} style={{ width: "100%", padding: "10px", border: "1px solid var(--border)", borderRadius: "6px", background: "var(--bg-input)", color: "var(--text-main)", fontSize: "14px", fontWeight: "600", outline: "none", textAlign: "center" }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Max iterations</label>
-                  <input type="number" value={maxIter} onChange={(e) => setMaxIter(Number(e.target.value))} style={{ width: "100%", padding: "10px", border: "1px solid var(--border)", borderRadius: "6px", background: "var(--bg-input)", color: "var(--text-main)", fontSize: "14px", fontWeight: "600", outline: "none", textAlign: "center" }} />
-                </div>
-              </div>
-              <div style={{ borderTop: "1px solid var(--border)", paddingTop: "12px", marginTop: "4px" }}>
-                <label style={{ fontSize: "11px", fontWeight: "800", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>Strict Thesis Constraints</label>
-                {[
-                  { label: "C1: 3D Orthogonal Rotation", val: true },
-                  { label: "C3: Bin Weight Capacity", val: true },
-                  { label: "C4: LBS-based Fragility", val: true },
-                  { label: "C5: 80% Base Support", val: true },
-                  { label: "C6: Multi-drop Extraction Order", val: true }
-                ].map(({ label, val }) => (
-                  <div className="switch-container" key={label}>
-                    <span className="switch-label">{label}</span>
-                    <label className="switch">
-                      <input type="checkbox" checked={val} readOnly disabled />
-                      <span className="slider" style={{ opacity: 0.6 }} />
-                    </label>
-                  </div>
-                ))}
-              </div>
+          <div className="wiz-line"></div>
+          <div 
+            className={`wiz-step ${isStepActive(2) ? "active" : ""} ${isStepDone(2) ? "done" : ""}`} 
+            style={{ flex: 1, opacity: isStepClickable(2) ? 1 : 0.55, cursor: isStepClickable(2) ? "pointer" : "default" }}
+            onClick={() => isStepClickable(2) && goToStep(2)}
+          >
+            <div className="wiz-num">2</div>
+            <div>
+              <div className="wiz-label">Items</div>
+              <div className="wiz-sub">Add boxes, or use a sample</div>
+            </div>
+          </div>
+          <div className="wiz-line"></div>
+          <div 
+            className={`wiz-step ${isStepActive(3) ? "active" : ""} ${isStepDone(3) ? "done" : ""}`} 
+            style={{ flex: 1, opacity: isStepClickable(3) ? 1 : 0.55, cursor: isStepClickable(3) ? "pointer" : "default" }}
+            onClick={() => isStepClickable(3) && goToStep(3)}
+          >
+            <div className="wiz-num">3</div>
+            <div>
+              <div className="wiz-label">Method</div>
+              <div className="wiz-sub">How to pack, and which rules apply</div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* ── Right Main Panel ── */}
-        <div style={{ flex: "2 1 600px", display: "flex", flexDirection: "column", gap: "20px" }}>
+      <style>{`
+        .wiz-step{ display:flex; align-items:center; gap:12px; padding:4px; }
+        .wiz-num{
+          width:30px;height:30px;border-radius:50%;flex-shrink:0;
+          background:var(--surface-sunken); color:var(--ink-faint);
+          display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;
+          border:1px solid var(--border);
+        }
+        .wiz-step.active .wiz-num{ background:var(--primary); color:#fff; border-color:var(--primary); }
+        .wiz-step.done .wiz-num{ background:var(--safe); color:#fff; border-color:var(--safe); }
+        .wiz-label{ font-size:13px; font-weight:700; color:var(--ink); }
+        .wiz-step.active .wiz-label{ color:var(--primary-dark); }
+        .wiz-sub{ font-size:11px; color:var(--ink-faint); }
+        .wiz-line{ height:1px; width:40px; background:var(--border-strong); margin:0 6px; flex-shrink:0; }
+      `}</style>
 
-          {/* Stats cards */}
-          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-            {[
-              { icon: "📦", value: totalItemsCount, label: "Total items", bg: "var(--blue-light)", fg: "var(--blue)" },
-              { icon: "⚖️", value: `${totalWeightSum} kg`, label: "Total weight", bg: "var(--green-light)", fg: "var(--green)" },
-              { icon: "🏷️", value: totalCategoriesCount, label: "Item categories", bg: "var(--amber-light)", fg: "var(--amber)" }
-            ].map(({ icon, value, label, bg, fg }) => (
-              <div className="stat-summary-card" key={label}>
-                <div className="stat-icon-wrapper" style={{ background: bg, color: fg }}>{icon}</div>
-                <div>
-                  <div style={{ fontSize: "22px", fontWeight: "800" }}>{value}</div>
-                  <div style={{ fontSize: "12px", color: "var(--text-dim)", fontWeight: "600" }}>{label}</div>
-                </div>
+      {/* ============ STEP 1: CONTAINER ============ */}
+      <div className={`wiz-panel ${currentStep === 1 ? "active" : ""}`}>
+        <div className="grid grid-2" style={{ alignItems: "start" }}>
+          <div className="card">
+            <div className="card-head">
+              <div>
+                <div className="card-title">Container dimensions</div>
+                <div className="card-desc">Width (X) × depth (Z) × height (Y), in centimeters</div>
               </div>
-            ))}
+            </div>
+            <div className="grid grid-3">
+              <div>
+                <label className="field-label">Width (cm)</label>
+                <input type="number" value={containerSpecs.L} onChange={(e) => handleContainerChange("L", e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Depth (cm)</label>
+                <input type="number" value={containerSpecs.D} onChange={(e) => handleContainerChange("D", e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Height (cm)</label>
+                <input type="number" value={containerSpecs.H} onChange={(e) => handleContainerChange("H", e.target.value)} />
+              </div>
+            </div>
+            <div style={{ marginTop: "16px" }}>
+              <label className="field-label">Max load capacity (kg)</label>
+              <input type="number" value={maxLoad} onChange={(e) => handleMaxLoadChange(e.target.value)} />
+              <div className="field-hint">Used to enforce the Weight Capacity constraint (C1)</div>
+            </div>
           </div>
 
-          {/* ── Option Selector Tabs ── */}
-          <div style={{ display: "flex", gap: "12px" }}>
-            <button style={optionTabStyle("A")} onClick={() => setActiveOption("A")}>
-              <span style={{ fontSize: "11px", fontWeight: "800", opacity: 0.75, letterSpacing: "0.07em", textTransform: "uppercase" }}>Option A</span>
-              <span style={{ fontSize: "14px" }}>Add items manually</span>
-            </button>
-            <button style={optionTabStyle("B")} onClick={() => setActiveOption("B")}>
-              <span style={{ fontSize: "11px", fontWeight: "800", opacity: 0.75, letterSpacing: "0.07em", textTransform: "uppercase" }}>Option B</span>
-              <span style={{ fontSize: "14px" }}>Use wtpack Benchmark Dataset</span>
-            </button>
+          <div className="card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+            <svg viewBox="0 0 120 100" width="140" height="110" style={{ marginBottom: "10px" }}>
+              <g fill="none" stroke="var(--primary)" strokeWidth="2">
+                <path d="M20 30 L60 15 L100 30 L100 75 L60 90 L20 75 Z"/>
+                <path d="M20 30 L60 45 L100 30"/>
+                <path d="M60 45 L60 90"/>
+              </g>
+            </svg>
+            <div className="font-display" style={{ fontSize: "16px", fontWeight: 600 }}>{containerSpecs.L} × {containerSpecs.D} × {containerSpecs.H} cm</div>
+            <div className="field-hint" style={{ marginTop: "2px" }}>{maxLoad.toLocaleString()} kg max load</div>
+            <div className="badge badge-safe" style={{ marginTop: "12px" }}>Custom Profile</div>
           </div>
+        </div>
+      </div>
 
-          {/* ─────────────────────────────────────────
-              OPTION A — Manual Item / Box log
-          ───────────────────────────────────────── */}
-          {activeOption === "A" && (
-            <div style={{ background: "var(--bg-card)", border: "2px solid var(--primary)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
-              {/* Header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: "12px", marginBottom: "18px" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <h4 style={{ fontSize: "16px", fontWeight: "800", color: "var(--text-main)" }}>Item / Box log</h4>
-                    <span className="badge badge-standard">{itemsList.length} items</span>
-                  </div>
-                  <p style={{ fontSize: "12px", color: "var(--text-dim)", marginTop: "4px" }}>
-                    Manually add your own boxes below, or import a CSV.
-                  </p>
-                </div>
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  <input type="file" accept=".csv" ref={fileInputRef} onChange={handleImportCSV} style={{ display: "none" }} />
-                  <button
-                    onClick={() => fileInputRef.current.click()}
-                    style={{ padding: "6px 12px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", cursor: "pointer" }}
-                  >
-                    Import CSV
-                  </button>
-                  <button
-                    onClick={handleAddItem}
-                    style={{ padding: "6px 12px", background: "var(--primary)", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: "700", color: "#ffffff", cursor: "pointer" }}
-                  >
-                    Add item
-                  </button>
-                </div>
+      {/* ============ STEP 2: ITEMS ============ */}
+      <div className={`wiz-panel ${currentStep === 2 ? "active" : ""}`}>
+        <div className="tabs-inline" style={{ marginBottom: "16px" }}>
+          <button className={activeOption === "A" ? "active" : ""} onClick={() => setActiveOption("A")}>Add items myself</button>
+          <button className={activeOption === "B" ? "active" : ""} onClick={() => setActiveOption("B")}>Use a sample dataset</button>
+        </div>
+
+        {/* Manual entry */}
+        <div style={{ display: activeOption === "A" ? "block" : "none" }}>
+          <div className="card">
+            <div className="card-head">
+              <div>
+                <div className="card-title">Add items manually</div>
+                <div className="card-desc">Define boxes one at a time, or import a CSV</div>
               </div>
-
-              {/* Add box form row */}
-              <form onSubmit={handleAddItem} className="add-box-form" style={{ display: "flex", gap: "8px", flexWrap: "wrap", background: "var(--bg-input)", padding: "12px", borderRadius: "8px", marginBottom: "16px", alignItems: "flex-end" }}>
-                {[
-                  { label: "Item ID", flex: "2 1 120px", value: newItemId, set: setNewItemId, type: "text" },
-                  { label: "Stop", flex: "1 1 60px", value: newItemStop, set: setNewItemStop, type: "number", min: 1 },
-                  { label: "Width (cm)", flex: "1 1 50px", value: newItemL, set: setNewL, type: "number" },
-                  { label: "Depth (cm)", flex: "1 1 50px", value: newItemD, set: setNewD, type: "number" },
-                  { label: "Height (cm)", flex: "1 1 50px", value: newItemH, set: setNewH, type: "number" },
-                  { label: "Weight (kg)", flex: "1 1 70px", value: newItemWeight, set: setNewWeight, type: "number" },
-                  { label: "Quantity", flex: "1 1 60px", value: newItemQty, set: setNewQty, type: "number" }
-                ].map(({ label, flex, value, set, type, min }) => (
-                  <div key={label} style={{ flex }}>
-                    <label style={{ fontSize: "10px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>{label}</label>
-                    <input
-                      type={type}
-                      min={min}
-                      value={value}
-                      onChange={(e) => set(e.target.value)}
-                      style={{ width: "100%", padding: "8px", border: "1px solid var(--border)", borderRadius: "4px", background: "var(--bg-card)", color: "var(--text-main)", fontSize: "13px", fontWeight: "600", outline: "none" }}
-                    />
-                  </div>
-                ))}
-                <div style={{ flex: "2 1 100px" }}>
-                  <label style={{ fontSize: "10px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Type</label>
-                  <select value={newItemType} onChange={(e) => setNewItemType(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--border)", borderRadius: "4px", background: "var(--bg-card)", color: "var(--text-main)", fontSize: "13px", outline: "none", fontWeight: "600" }}>
-                    <option value="Standard">Standard</option>
-                    <option value="Fragile">Fragile</option>
-                    <option value="Heavy">Heavy</option>
-                  </select>
-                </div>
-                <button type="submit" style={{ padding: "8px 16px", background: "var(--primary)", border: "none", borderRadius: "4px", color: "#ffffff", fontSize: "13px", fontWeight: "700", cursor: "pointer", height: "35px" }}>
-                  ✓ Add
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input type="file" accept=".csv" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileUpload} />
+                <button className="btn btn-secondary btn-sm" onClick={() => fileInputRef.current?.click()}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+                  Import CSV
                 </button>
-              </form>
+                <button className="btn btn-danger-ghost btn-sm" onClick={handleClearManual}>Clear Items</button>
+              </div>
+            </div>
+            
+            {/* Inline Add Box Form */}
+            <div className="grid grid-4 add-box-form" style={{ background: "var(--surface-sunken)", padding: "16px", borderRadius: "var(--radius-sm)", marginBottom: "16px" }}>
+              <div>
+                <label className="field-label">Width (X)</label>
+                <input type="number" placeholder="cm" value={newItemL} onChange={(e) => setNewL(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Depth (Z)</label>
+                <input type="number" placeholder="cm" value={newItemD} onChange={(e) => setNewD(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Height (Y)</label>
+                <input type="number" placeholder="cm" value={newItemH} onChange={(e) => setNewH(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Weight</label>
+                <input type="number" placeholder="kg" value={newItemWeight} onChange={(e) => setNewWeight(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Type</label>
+                <select value={newItemType} onChange={(e) => setNewItemType(e.target.value)}>
+                  <option>Standard</option>
+                  <option>Fragile</option>
+                  <option>Heavy</option>
+                </select>
+              </div>
+              <div>
+                <label className="field-label">Stop</label>
+                <input type="number" min="1" value={newItemStop} onChange={(e) => setNewItemStop(e.target.value)} />
+              </div>
+              <div>
+                <label className="field-label">Qty</label>
+                <input type="number" min="1" value={newItemQty} onChange={(e) => setNewQty(e.target.value)} />
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end" }}>
+                <button className="btn btn-primary" style={{ width: "100%" }} onClick={handleAddItem}>+ Add</button>
+              </div>
+            </div>
 
-              {/* Manual items table — empty state when no manual items */}
-              <div style={{ overflowX: "auto", maxHeight: "300px" }}>
+            <table className="custom-table">
+              <thead><tr><th>Item ID</th><th>Stop</th><th>W (cm)</th><th>D (cm)</th><th>H (cm)</th><th>Weight (kg)</th><th>Qty</th><th>Type</th></tr></thead>
+              <tbody>
                 {itemsList.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--text-dim)" }}>
-                    <div style={{ fontSize: "32px", marginBottom: "10px", opacity: 0.4 }}>📦</div>
-                    <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "4px" }}>No items added yet</div>
-                    <div style={{ fontSize: "12px" }}>Use the form above or import a CSV to add boxes.</div>
-                  </div>
+                  <tr><td colSpan="8" style={{ textAlign: "center", padding: "32px", color: "var(--ink-faint)" }}>No items added yet — use the form above or import a CSV.</td></tr>
                 ) : (
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Item ID</th><th>Stop</th><th>Width (cm)</th><th>Depth (cm)</th><th>Height (cm)</th><th>Weight (kg)</th><th>Quantity</th><th>Type</th><th style={{ width: "60px" }}></th>
-                      </tr>
+                  itemsList.map((item, idx) => (
+                    <tr key={idx}>
+                      <td>{item.id || `BOX-${idx}`}</td>
+                      <td>{item.stop || 1}</td>
+                      <td>{item.length || item.L || item.l || 0}</td>
+                      <td>{item.depth || item.D || item.d || 0}</td>
+                      <td>{item.height || item.H || item.h || 0}</td>
+                      <td>{item.weight || item.Weight || 0}</td>
+                      <td>{item.quantity || 1}</td>
+                      <td>
+                        <span className={`badge ${item.Type === "Fragile" ? "badge-warn" : (item.Type === "Heavy" ? "badge-danger" : "badge-neutral")}`}>
+                          {item.Type || "Standard"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Library dataset */}
+        <div style={{ display: activeOption === "B" ? "block" : "none" }}>
+          <div className="card">
+            <div className="card-head">
+              <div>
+                <div className="card-title">wtpack Validation Dataset</div>
+                <div className="card-desc">Select a wtpack benchmark instance to load.</div>
+              </div>
+            </div>
+            <div className="grid grid-2" style={{ alignItems: "end", marginBottom: "16px" }}>
+              <div>
+                <label className="field-label">Choose a sample</label>
+                <select value={selected} onChange={(e) => setSelected(e.target.value)} disabled={loadingList}>
+                  <option value="">-- Select an instance --</option>
+                  {Object.entries(groupedInstances).map(([group, insts]) => (
+                    <optgroup key={group} label={group}>
+                      {insts.map((inst) => (
+                        <option key={inst.path} value={inst.path}>{inst.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <div className="field-hint">Instances annotated with weights, LBS, and multi-drop stops</div>
+              </div>
+              <button className="btn btn-secondary" style={{ width: "fit-content" }} onClick={handleClearInstance}>Clear selection</button>
+            </div>
+            
+            {instanceItems.length > 0 && (
+              <>
+                <div style={{ display: "flex", gap: "16px", marginBottom: "14px" }}>
+                  <span className="badge badge-primary">{totalInstanceItems} items loaded</span>
+                  <span className="badge badge-neutral">{totalInstanceWeight.toLocaleString()} kg total</span>
+                </div>
+                <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)" }}>
+                  <table className="custom-table" style={{ border: "none" }}>
+                    <thead style={{ position: "sticky", top: 0, background: "var(--surface)" }}>
+                      <tr><th>Item ID</th><th>Stop</th><th>W (cm)</th><th>D (cm)</th><th>H (cm)</th><th>Weight (kg)</th><th>LBS</th><th>Type</th></tr>
                     </thead>
                     <tbody>
-                      {itemsList.map((item) => (
-                        <tr key={item.id}>
-                          <td style={{ fontWeight: "700", color: "var(--text-main)" }}>{item.id}</td>
-                          <td style={{ fontWeight: "700", color: "var(--primary)" }}>{item.Stop || 1}</td>
-                          <td>{item.L}</td>
-                          <td>{item.D}</td>
-                          <td>{item.H}</td>
-                          <td>{item.Weight}</td>
-                          <td style={{ fontWeight: "700" }}>{item.Qty}</td>
-                          <td><span className={`badge badge-${item.Type.toLowerCase()}`}>{item.Type}</span></td>
+                      {instanceItems.map((item, idx) => (
+                        <tr key={idx}>
+                          <td>{item.id}</td>
+                          <td>{item.stop || 1}</td>
+                          <td>{item.length}</td>
+                          <td>{item.depth}</td>
+                          <td>{item.height}</td>
+                          <td>{item.Weight || item.weight}</td>
+                          <td>{item.LBS}</td>
                           <td>
-                            <button onClick={() => handleRemoveItem(item.id)} style={{ background: "transparent", border: "none", color: "var(--red)", fontSize: "16px", cursor: "pointer" }} title="Remove item">✕</button>
+                            <span className={`badge ${item.fragile ? "badge-warn" : "badge-neutral"}`}>
+                              {item.fragile ? "Fragile" : "Standard"}
+                            </span>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ─────────────────────────────────────────
-              OPTION B — OR-Library Benchmark Dataset
-          ───────────────────────────────────────── */}
-          {activeOption === "B" && (
-            <div style={{ background: "var(--bg-card)", border: "2px solid var(--primary)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
-              <div style={{ marginBottom: "16px" }}>
-                <h4 style={{ fontSize: "16px", fontWeight: "800", color: "var(--text-main)", marginBottom: "4px" }}>wtpack Validation Dataset</h4>
-                <p style={{ fontSize: "12px", color: "var(--text-dim)" }}>
-                  Select a wtpack benchmark instance. The item list below will reflect the loaded dataset — your manually added items are not affected.
-                </p>
-              </div>
-
-              {/* Instance selector dropdown */}
-              {loadingList ? (
-                <span style={{ color: "var(--text-muted)", fontSize: "14px" }}>Loading instances...</span>
-              ) : (
-                <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "20px" }}>
-                  <select
-                    style={{ flex: 1, padding: "12px", background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: "8px", color: selected ? "var(--text-main)" : "var(--text-dim)", fontSize: "14px", fontWeight: "600", outline: "none" }}
-                    value={selected}
-                    onChange={(e) => setSelected(e.target.value)}
-                    disabled={running}
-                  >
-                    <option value="" disabled>— Select a benchmark instance —</option>
-                    {Object.entries(groupedInstances).map(([setName, insts]) => (
-                      <optgroup key={setName} label={setName}>
-                        {insts.map((inst) => (
-                          <option key={inst.path} value={inst.path}>{inst.label}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  {selected && (
-                    <button
-                      onClick={() => setSelected("")}
-                      disabled={running}
-                      style={{
-                        padding: "10px 14px",
-                        background: "transparent",
-                        border: "1px solid var(--border)",
-                        borderRadius: "8px",
-                        color: "var(--text-muted)",
-                        fontSize: "13px",
-                        fontWeight: "700",
-                        cursor: running ? "not-allowed" : "pointer",
-                        whiteSpace: "nowrap",
-                        flexShrink: 0
-                      }}
-                      title="Clear selected instance"
-                    >
-                      ✕ Clear
-                    </button>
-                  )}
                 </div>
-              )}
-
-              {/* Instance preview table */}
-              <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-main)" }}>Dataset Preview</span>
-                  {instanceItems.length > 0 && (
-                    <span className="badge badge-standard">{instanceItems.reduce((s, i) => s + Number(i.Qty), 0)} items loaded</span>
-                  )}
-                </div>
-                <div style={{ overflowX: "auto", maxHeight: "300px" }}>
-                  {instanceItems.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--text-dim)" }}>
-                      <div style={{ fontSize: "32px", marginBottom: "10px", opacity: 0.4 }}>🗂️</div>
-                      <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "4px" }}>No instance loaded</div>
-                      <div style={{ fontSize: "12px" }}>Select a dataset above to preview its items here.</div>
-                    </div>
-                  ) : (
-                    <table className="custom-table">
-                      <thead>
-                        <tr>
-                          <th>Item ID</th><th>Stop</th><th>Width (cm)</th><th>Depth (cm)</th><th>Height (cm)</th><th>Weight (kg)</th><th>Quantity</th><th>Type</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {instanceItems.map((item, idx) => (
-                          <tr key={item.id || idx}>
-                            <td style={{ fontWeight: "700", color: "var(--text-main)" }}>{item.id}</td>
-                            <td style={{ fontWeight: "700", color: "var(--primary)" }}>{item.Stop || 1}</td>
-                            <td>{item.L}</td>
-                            <td>{item.D}</td>
-                            <td>{item.H}</td>
-                            <td>{item.Weight}</td>
-                            <td style={{ fontWeight: "700" }}>{item.Qty}</td>
-                            <td><span className={`badge badge-${(item.Type || "standard").toLowerCase()}`}>{item.Type || "Standard"}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* ── Bottom Status bar ── */}
-      <div style={{
-        background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px",
-        padding: "16px 24px", boxShadow: "var(--shadow)",
-        display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px"
-      }}>
-        <div style={{ fontSize: "13px", color: "var(--text-dim)", display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ color: "var(--text-main)", fontWeight: "700" }}>{totalItemsCount}</span> items ready
-          <span style={{ opacity: 0.4, margin: "0 4px" }}>·</span>
-          Source: <span style={{ color: "var(--primary)", fontWeight: "700" }}>{activeOption === "A" ? "Manual" : "wtpack"}</span>
-          <span style={{ opacity: 0.4, margin: "0 4px" }}>·</span>
-          Strategy: <span style={{ color: "var(--primary)", fontWeight: "700" }}>{strategy}</span>
-          <span style={{ opacity: 0.4, margin: "0 4px" }}>·</span>
-          Total: <span style={{ color: "var(--text-main)", fontWeight: "700" }}>{totalWeightSum.toLocaleString()} kg</span>
+      {/* ============ STEP 3: ALGORITHM ============ */}
+      <div className={`wiz-panel ${currentStep === 3 ? "active" : ""}`}>
+        <div className="grid grid-2" style={{ alignItems: "start" }}>
+          <div className="card">
+            <div className="card-head">
+              <div>
+                <div className="card-title">Packing method</div>
+                <div className="card-desc">Choose which approach the solver should use to arrange the items</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <label className="strategy-opt">
+                <input type="radio" name="strategy" checked={strategy === "DGWO"} onChange={() => setStrategy("DGWO")} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "13px" }}>Placement only <span className="field-hint" style={{ fontWeight: 400 }}>(DGWO)</span></div>
+                  <div className="field-hint">Focuses purely on fitting items in tightly — doesn't balance safety rules against space</div>
+                </div>
+              </label>
+              <label className="strategy-opt">
+                <input type="radio" name="strategy" checked={strategy === "MOGWO"} onChange={() => setStrategy("MOGWO")} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "13px" }}>Rules only <span className="field-hint" style={{ fontWeight: 400 }}>(MOGWO)</span></div>
+                  <div className="field-hint">Focuses purely on satisfying weight, fragility, and stop-order rules</div>
+                </div>
+              </label>
+              <label className="strategy-opt">
+                <input type="radio" name="strategy" checked={strategy === "Sequential"} onChange={() => setStrategy("Sequential")} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "13px" }}>Placement, then rules <span className="field-hint" style={{ fontWeight: 400 }}>(Sequential Hybrid)</span></div>
+                  <div className="field-hint">Packs tightly first, then adjusts the layout to satisfy the rules</div>
+                </div>
+              </label>
+              <label className="strategy-opt">
+                <input type="radio" name="strategy" checked={strategy === "Repair-Based"} onChange={() => setStrategy("Repair-Based")} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "13px" }}>Fix as it goes <span className="field-hint" style={{ fontWeight: 400 }}>(Repair-Based Hybrid)</span></div>
+                  <div className="field-hint">Checks and corrects each item's placement immediately as it's packed</div>
+                </div>
+              </label>
+            </div>
+            <style>{`
+              .strategy-opt{ display:flex; gap:12px; align-items:flex-start; padding:11px 12px; border:1px solid var(--border); border-radius:var(--radius-md); cursor:pointer; }
+              .strategy-opt:has(input:checked){ border-color:var(--primary); background:var(--primary-tint); }
+              .strategy-opt input{ margin-top:3px; accent-color:var(--primary); }
+            `}</style>
+
+            <div className="divider"></div>
+            <div className="grid grid-2">
+              <div>
+                <label className="field-label">Swarm size (pop)</label>
+                <input type="number" value={wolfSize} onChange={(e) => setWolfSize(Number(e.target.value))} />
+                <div className="field-hint">More can find better results, but takes longer</div>
+              </div>
+              <div>
+                <label className="field-label">How many rounds to search</label>
+                <input type="number" value={maxIter} onChange={(e) => setMaxIter(Number(e.target.value))} />
+                <div className="field-hint">More rounds refine the result further</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-head">
+              <div>
+                <div className="card-title">Safety &amp; delivery rules</div>
+                <div className="card-desc">Turn on the rules this packing plan needs to follow</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              <div className="constraint-row">
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "13px" }}>Stay under weight limit (C3)</div>
+                  <div className="field-hint">Total load per container can't exceed its max weight</div>
+                </div>
+                <label className="switch"><input type="checkbox" checked disabled /><span className="slider"></span></label>
+              </div>
+              <div className="constraint-row">
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "13px" }}>Protect fragile items (C4)</div>
+                  <div className="field-hint">Fragile boxes won't have heavy items stacked on top</div>
+                </div>
+                <label className="switch"><input type="checkbox" checked={fragilityConstraint} onChange={(e) => setFragilityConstraint(e.target.checked)} /><span className="slider"></span></label>
+              </div>
+              <div className="constraint-row">
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "13px" }}>Keep the load stable (C5)</div>
+                  <div className="field-hint">Each item requires 80% base support so it won't tip</div>
+                </div>
+                <label className="switch"><input type="checkbox" checked disabled /><span className="slider"></span></label>
+              </div>
+              <div className="constraint-row">
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "13px" }}>Unload in the right order (C6)</div>
+                  <div className="field-hint">Items for earlier stops are packed where they're reachable first (LIFO)</div>
+                </div>
+                <label className="switch"><input type="checkbox" checked={lifoConstraint} onChange={(e) => setLifoConstraint(e.target.checked)} /><span className="slider"></span></label>
+              </div>
+              <div className="constraint-row" style={{ borderBottom: "none" }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "13px" }}>Allow items to be rotated (C1)</div>
+                  <div className="field-hint">Lets the solver turn items sideways (3D Orthogonal) to fit more efficiently</div>
+                </div>
+                <label className="switch"><input type="checkbox" checked={rotationConstraint} onChange={(e) => setRotationConstraint(e.target.checked)} /><span className="slider"></span></label>
+              </div>
+            </div>
+            <style>{`.constraint-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 2px; border-bottom:1px solid var(--border); }`}</style>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-          {activeOption === "A" && (
-            <button
-              onClick={() => { setItemsList([]); setIsCustomized(true); }}
-              style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}
-            >
-              Clear all
-            </button>
-          )}
-          {!running && !isBenchmarking ? (
+      </div>
+
+      {/* Persistent summary + nav */}
+      <div className="card" style={{ marginTop: "20px", position: "sticky", bottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "var(--shadow-2)", zIndex: 10 }}>
+        <div style={{ display: "flex", gap: "22px", alignItems: "center" }}>
+          <div>
+            <span className="field-hint">Container</span>
+            <div style={{ fontWeight: 700, fontSize: "13px" }}>{containerSpecs.L}×{containerSpecs.D}×{containerSpecs.H} cm</div>
+          </div>
+          <div style={{ width: "1px", height: "28px", background: "var(--border)" }}></div>
+          <div>
+            <span className="field-hint">Items</span>
+            <div style={{ fontWeight: 700, fontSize: "13px" }}>
+              {activeOption === "A" ? `${totalManualItems} ready · Manual` : `${totalInstanceItems} ready · wtpack`}
+            </div>
+          </div>
+          <div style={{ width: "1px", height: "28px", background: "var(--border)" }}></div>
+          <div>
+            <span className="field-hint">Method</span>
+            <div style={{ fontWeight: 700, fontSize: "13px" }}>{strategy}</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          {running ? (
             <>
-              <button
-                onClick={handleBenchmarkRun}
-                disabled={!canRun}
-                style={{
-                  padding: "10px 24px",
-                  background: canRun ? "var(--bg-input)" : "var(--text-dim)",
-                  border: canRun ? "1px solid var(--border)" : "none",
-                  color: canRun ? "var(--text-main)" : "#ffffff", 
-                  borderRadius: "6px",
-                  fontSize: "14px", fontWeight: "700",
-                  cursor: canRun ? "pointer" : "not-allowed",
-                  transition: "all 0.15s ease", whiteSpace: "nowrap"
-                }}
-              >
-                Compare All Strategies
-              </button>
-              <button
-                onClick={handleStartRun}
-                disabled={!canRun}
-                style={{
-                  padding: "10px 24px",
-                  background: canRun ? "var(--primary)" : "var(--text-dim)",
-                  color: "#ffffff", border: "none", borderRadius: "6px",
-                  fontSize: "14px", fontWeight: "700",
-                  cursor: canRun ? "pointer" : "not-allowed",
-                  transition: "all 0.15s ease", whiteSpace: "nowrap"
-                }}
-              >
-                Run optimizer
-              </button>
+              <span className="field-hint">Elapsed: {formatTime(elapsed)}</span>
+              <button className="btn btn-danger-ghost" onClick={handleStopRun}>Stop</button>
             </>
           ) : (
             <>
-              <button disabled style={{ padding: "10px 24px", background: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--text-muted)", borderRadius: "6px", fontSize: "14px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid var(--primary)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                {isBenchmarking ? "Benchmarking..." : `Running... ${elapsed}s`}
-              </button>
-              <button onClick={handleStopRun} style={{ padding: "10px 24px", background: "var(--red-light)", border: "1px solid var(--red)", color: "var(--red)", borderRadius: "6px", fontSize: "14px", fontWeight: "700", cursor: "pointer" }}>
-                ■ Stop
-              </button>
+              {currentStep > 1 && <button className="btn btn-secondary" onClick={() => goToStep(currentStep - 1)}>← Back</button>}
+              {currentStep < 3 && <button className="btn btn-secondary" onClick={() => goToStep(currentStep + 1)}>Next step →</button>}
+              {currentStep === 3 && (
+                <>
+                  <button className="btn btn-secondary" onClick={handleBenchmarkRun} disabled={!canRun}>Run Benchmark</button>
+                  <button className="btn btn-primary" onClick={handleStartRun} disabled={!canRun}>
+                    <svg viewBox="0 0 24 24" fill="currentColor" strokeWidth="2"><path d="M8 5v14l11-7z"/></svg>
+                    Run optimizer
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
       </div>
-    </div>
+    </>
   );
 }

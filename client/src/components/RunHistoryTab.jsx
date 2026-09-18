@@ -1,162 +1,85 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 
-function formatDate(dateStr) {
-  if (!dateStr) return "N/A";
-  let date;
-  if (dateStr.endsWith("Z") || dateStr.includes("T")) {
-    date = new Date(dateStr);
-  } else {
-    date = new Date(dateStr.replace(" ", "T") + "Z");
-  }
-  if (isNaN(date.getTime())) return dateStr;
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-}
+export default function RunHistoryTab({ runHistory, handleExportHistory, onLoadVisualization }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterMethod, setFilterMethod] = useState("All methods");
 
-export default function RunHistoryTab({
-  runHistory,
-  handleExportHistory,
-  onLoadVisualization
-}) {
-  // Local search and filter states
-  const [historyFilter, setHistoryFilter] = useState("All");
-  const [historySearchQuery, setHistorySearchQuery] = useState("");
-
-  // Filtered run history (with Search)
-  const filteredHistory = useMemo(() => {
-    let list = runHistory;
-    if (historyFilter !== "All") {
-      list = list.filter((r) => r.strategy === historyFilter);
-    }
-    if (historySearchQuery.trim() !== "") {
-      list = list.filter((r) =>
-        r.instance.toLowerCase().includes(historySearchQuery.toLowerCase())
-      );
-    }
-    return list;
-  }, [runHistory, historyFilter, historySearchQuery]);
+  const filteredHistory = runHistory.filter((run) => {
+    if (searchTerm && !run.instance.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (filterMethod !== "All methods" && run.strategy !== filterMethod) return false;
+    return true;
+  });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-      
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div className="card">
+      <div className="card-head">
         <div>
-          <h3 style={{ fontSize: "18px", fontWeight: "800" }}>Run History Database</h3>
-          <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>Saved local runs stored inside SQLite.</span>
+          <div className="card-title">Past runs</div>
+          <div className="card-desc">Every packing attempt you've run, saved automatically</div>
         </div>
-        
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <input
-            type="text"
-            placeholder="Search runs..."
-            value={historySearchQuery}
-            onChange={(e) => setHistorySearchQuery(e.target.value)}
-            style={{
-              padding: "8px 12px",
-              background: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              borderRadius: "6px",
-              color: "var(--text-main)",
-              fontSize: "13px",
-              outline: "none",
-              width: "180px"
-            }}
+        <div style={{ display: "flex", gap: "8px" }}>
+          <input 
+            type="text" 
+            placeholder="Search past runs..." 
+            style={{ width: "180px" }} 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-          
-          <select
-            value={historyFilter}
-            onChange={(e) => setHistoryFilter(e.target.value)}
-            style={{ padding: "8px 12px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", fontWeight: "600", outline: "none" }}
-          >
-            <option value="All">All Strategies</option>
-            <option value="DGWO">Standalone DGWO</option>
-            <option value="MOGWO">Standalone MOGWO</option>
-            <option value="SEQ">Sequential Hybrid</option>
-            <option value="REP">Repair-based Hybrid</option>
+          <select style={{ width: "170px" }} value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
+            <option>All methods</option>
+            <option>DGWO</option>
+            <option>MOGWO</option>
+            <option>Sequential</option>
+            <option>Repair-Based</option>
           </select>
-
-          <button
-            onClick={handleExportHistory}
-            style={{ padding: "8px 12px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "13px", fontWeight: "600", color: "var(--text-muted)", cursor: "pointer" }}
-          >
-            Export all
-          </button>
+          <button className="btn btn-secondary btn-sm" onClick={handleExportHistory}>Export all</button>
         </div>
       </div>
-
-      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", boxShadow: "var(--shadow)", overflow: "hidden" }}>
-        {filteredHistory.length > 0 ? (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
-              <thead>
-                <tr style={{ background: "var(--bg-input)", borderBottom: "2px solid var(--border)" }}>
-                  <th style={{ padding: "14px 16px", color: "var(--text-dim)" }}>ID</th>
-                  <th style={{ padding: "14px 16px", color: "var(--text-dim)" }}>Instance File</th>
-                  <th style={{ padding: "14px 16px", color: "var(--text-dim)" }}>Strategy</th>
-                  <th style={{ padding: "14px 16px", color: "var(--text-dim)", textAlign: "center" }}>Bins Used</th>
-                  <th style={{ padding: "14px 16px", color: "var(--text-dim)", textAlign: "right" }}>Space Util.</th>
-                  <th style={{ padding: "14px 16px", color: "var(--text-dim)", textAlign: "right" }}>Runtime</th>
-                  <th style={{ padding: "14px 16px", color: "var(--text-dim)", textAlign: "right" }}>Completed At</th>
-                  <th style={{ padding: "14px 16px", color: "var(--text-dim)", textAlign: "center" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredHistory.map((run) => (
-                  <tr key={run.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                    <td style={{ padding: "14px 16px", fontWeight: "700", color: "var(--primary)" }}>#{run.id.toString().padStart(3, "0")}</td>
-                    <td style={{ padding: "14px 16px", fontWeight: "600" }}>{run.instance}</td>
-                    <td style={{ padding: "14px 16px" }}>
-                      <span style={{
-                        padding: "4px 8px",
-                        borderRadius: "4px",
-                        fontSize: "11px",
-                        fontWeight: "700",
-                        background: run.strategy === "REP" ? "var(--primary-light)" : run.strategy === "SEQ" ? "var(--blue-light)" : run.strategy === "DGWO" ? "var(--green-light)" : "var(--amber-light)",
-                        color: run.strategy === "REP" ? "var(--primary)" : run.strategy === "SEQ" ? "var(--blue)" : run.strategy === "DGWO" ? "var(--green)" : "var(--amber)"
-                      }}>
-                        {run.strategy}
-                      </span>
-                    </td>
-                    <td style={{ padding: "14px 16px", textAlign: "center", fontWeight: "700" }}>{run.bins_used}</td>
-                    <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: "600", color: "var(--green)" }}>{run.space_util}%</td>
-                    <td style={{ padding: "14px 16px", textAlign: "right" }}>{run.runtime_s}s</td>
-                    <td style={{ padding: "14px 16px", textAlign: "right", color: "var(--text-dim)" }}>
-                      {formatDate(run.created_at)}
-                    </td>
-                    <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                      <button
-                        onClick={() => onLoadVisualization(run)}
-                        disabled={!run.placements}
-                        style={{
-                          padding: "6px 10px",
-                          background: run.placements ? "var(--primary)" : "var(--bg-input)",
-                          color: run.placements ? "#ffffff" : "var(--text-muted)",
-                          border: "1px solid var(--border)",
-                          borderRadius: "4px",
-                          fontSize: "11px",
-                          fontWeight: "700",
-                          cursor: run.placements ? "pointer" : "not-allowed",
-                          opacity: run.placements ? 1 : 0.6,
-                          transition: "all 0.15s ease"
-                        }}
-                        title={run.placements ? "Load this run in the 3D viewport" : "No placement coordinates saved for this run"}
-                      >
-                        🔎 Visualize
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div style={{ padding: "48px", textAlign: "center" }}>
-            <span style={{ fontSize: "28px" }}>📂</span>
-            <h4 style={{ marginTop: "12px", color: "var(--text-muted)" }}>No Runs Logged</h4>
-            <p style={{ fontSize: "12px", color: "var(--text-dim)", marginTop: "4px" }}>Runs completed in this session will populate here.</p>
-          </div>
-        )}
-      </div>
-
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Load used</th>
+            <th>Method</th>
+            <th>Containers used</th>
+            <th>Space used</th>
+            <th>Time taken</th>
+            <th>Memory used</th>
+            <th>Finished</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredHistory.length === 0 ? (
+            <tr>
+              <td colSpan="9" style={{ textAlign: "center", padding: "32px", color: "var(--ink-faint)" }}>
+                No run history found. Run an optimization first!
+              </td>
+            </tr>
+          ) : (
+            filteredHistory.map((run, idx) => (
+              <tr key={idx}>
+                <td className="mono">#{String(idx + 1).padStart(3, "0")}</td>
+                <td>{run.instance} ({run.n_items} items)</td>
+                <td>
+                  <span className={`badge ${run.strategy === "Repair-Based" || run.strategy === "Sequential" ? "badge-primary" : "badge-neutral"}`}>
+                    {run.strategy}
+                  </span>
+                </td>
+                <td>{run.bins_used}</td>
+                <td className="mono">{run.space_util?.toFixed(2)}%</td>
+                <td className="mono">{run.runtime_s?.toFixed(2)}s</td>
+                <td className="mono">—</td>
+                <td>{new Date(run.timestamp).toLocaleString()}</td>
+                <td>
+                  <button className="btn btn-ghost btn-sm" onClick={() => onLoadVisualization(run)}>View</button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+      <div className="field-hint" style={{ marginTop: "14px" }}>The Memory used column will fill in once memory tracking is fully propagated in DB.</div>
     </div>
   );
 }

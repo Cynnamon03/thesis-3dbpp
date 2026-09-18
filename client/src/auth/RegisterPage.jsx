@@ -45,13 +45,13 @@ export default function RegisterPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "30px" }}>
           <img src={logoImg} alt="STACKR Logo" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "contain" }} />
           <div style={{ textAlign: "left" }}>
-            <h2 style={{ fontSize: "18px", fontWeight: "800", color: "var(--text-main)", lineHeight: 1.1 }}>STACKR</h2>
-            <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: "600" }}>3D Bin Packing Optimizer</span>
+            <h2 style={{ fontSize: "18px", fontWeight: "800", color: "var(--ink)", lineHeight: 1.1 }}>STACKR</h2>
+            <span style={{ fontSize: "11px", color: "var(--ink-faint)", fontWeight: "600" }}>3D Bin Packing Optimizer</span>
           </div>
         </div>
 
-        <h3 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text-main)", textAlign: "left", marginBottom: "4px" }}>Create account</h3>
-        <p style={{ fontSize: "13px", color: "var(--text-dim)", textAlign: "left", marginBottom: "28px" }}>Sign up to start optimizing your containers</p>
+        <h3 style={{ fontSize: "22px", fontWeight: "800", color: "var(--ink)", textAlign: "left", marginBottom: "4px" }}>Create account</h3>
+        <p style={{ fontSize: "13px", color: "var(--ink-faint)", textAlign: "left", marginBottom: "28px" }}>Sign up to start optimizing your containers</p>
 
         {err && (
           <div style={{
@@ -69,8 +69,8 @@ export default function RegisterPage() {
         )}
 
         <form onSubmit={submit}>
-          <div className="form-group">
-            <label className="form-label">Full Name</label>
+          <div className="form-group" style={{ marginBottom: "16px" }}>
+            <label className="field-label">Full Name</label>
             <div className="input-container">
               <span className="input-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -89,8 +89,8 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Email Address</label>
+          <div className="form-group" style={{ marginBottom: "16px" }}>
+            <label className="field-label">Email Address</label>
             <div className="input-container">
               <span className="input-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -110,7 +110,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="form-group" style={{ marginBottom: "20px" }}>
-            <label className="form-label">Password</label>
+            <label className="field-label">Password</label>
             <div className="input-container">
               <span className="input-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -142,9 +142,9 @@ export default function RegisterPage() {
                     padding: "10px 0",
                     borderRadius: "6px",
                     cursor: "pointer",
-                    border: role === r.value ? "2px solid var(--primary)" : "1px solid var(--border)",
-                    background: role === r.value ? "var(--primary-light)" : "var(--bg-input)",
-                    color: role === r.value ? "var(--primary)" : "var(--text-muted)",
+                    border: role === r.value ? "2px solid var(--primary)" : "1px solid var(--border-strong)",
+                    background: role === r.value ? "var(--primary-tint)" : "var(--surface)",
+                    color: role === r.value ? "var(--primary)" : "var(--ink-soft)",
                     fontWeight: role === r.value ? "700" : "500",
                     fontSize: "13px",
                     transition: "all 0.15s ease"
@@ -156,12 +156,12 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <button type="submit" className="btn-primary" disabled={loading}>
+          <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "10px", fontSize: "14px" }} disabled={loading}>
             {loading ? "Creating account..." : "Create account"}
           </button>
         </form>
 
-        <p style={{ marginTop: "28px", fontSize: "13px", color: "var(--text-muted)", textAlign: "center" }}>
+        <p style={{ marginTop: "28px", fontSize: "13px", color: "var(--ink-soft)", textAlign: "center" }}>
           Already have an account? <Link to="/login" style={{ color: "var(--primary)", fontWeight: "700", textDecoration: "none" }}>Sign in</Link>
         </p>
       </div>

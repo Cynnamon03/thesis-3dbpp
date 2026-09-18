@@ -50,226 +50,154 @@ export default function VisualizationTab({
   }, [placements, itemsList, filterStandard, filterFragile, selectedStop]);
 
   return (
-    <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-start" }}>
-      
-      {/* Sidebar Left Column Wrapper */}
-      <div style={{ flex: "1 1 280px", display: "flex", flexDirection: "column", gap: "20px" }}>
+    <div className="grid" style={{ gridTemplateColumns: "260px 1fr", alignItems: "start" }}>
+      <div className="card">
+        <div className="section-tag">View controls</div>
+        <div className="grid grid-2" style={{ marginBottom: "14px" }}>
+          <button className={`btn btn-sm ${viewportOrientation === 'Front' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => triggerViewReset("Front")}>Front</button>
+          <button className={`btn btn-sm ${viewportOrientation === 'Side' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => triggerViewReset("Side")}>Side</button>
+          <button className={`btn btn-sm ${viewportOrientation === 'Top' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => triggerViewReset("Top")}>Top</button>
+          <button className={`btn btn-sm ${viewportOrientation === '3D' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => triggerViewReset("3D")}>3D</button>
+        </div>
+        <div className="divider"></div>
+        <div className="section-tag">Filter by type</div>
+        <div className="constraint-row">
+          <span style={{ fontSize: "12.5px", fontWeight: 600 }}>Standard</span>
+          <label className="switch"><input type="checkbox" checked={filterStandard} onChange={(e) => setFilterStandard(e.target.checked)} /><span className="slider"></span></label>
+        </div>
+        <div className="constraint-row" style={{ borderBottom: "none" }}>
+          <span style={{ fontSize: "12.5px", fontWeight: 600 }}>Fragile</span>
+          <label className="switch"><input type="checkbox" checked={filterFragile} onChange={(e) => setFilterFragile(e.target.checked)} /><span className="slider"></span></label>
+        </div>
         
-        {/* View controls panel */}
-        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
-          <h4 className="form-label" style={{ color: "var(--primary)", borderBottom: "1px solid var(--border)", paddingBottom: "8px", marginBottom: "16px" }}>
-            ● VIEW CONTROLS
-          </h4>
-          
-          <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-            {/* Rotate preset buttons */}
-            <div>
-              <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>
-                Rotate view
-              </label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-                {["Front", "Side", "Top", "3D"].map((dir) => (
-                  <button
-                    key={dir}
-                    onClick={() => triggerViewReset(dir)}
-                    style={{
-                      padding: "8px",
-                      borderRadius: "4px",
-                      border: "1px solid var(--border)",
-                      background: viewportOrientation === dir ? "var(--primary)" : "var(--bg-input)",
-                      color: viewportOrientation === dir ? "#ffffff" : "var(--text-muted)",
-                      fontSize: "12px",
-                      fontWeight: "700",
-                      cursor: "pointer"
-                    }}
-                  >
-                    {dir}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Filter switches */}
-            <div>
-              <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>
-                Filter by type
-              </label>
-              <div className="switch-container">
-                <span className="switch-label">Standard</span>
-                <label className="switch">
-                  <input type="checkbox" checked={filterStandard} onChange={(e) => setFilterStandard(e.target.checked)} />
-                  <span className="slider" />
-                </label>
-              </div>
-              <div className="switch-container">
-                <span className="switch-label">Fragile</span>
-                <label className="switch">
-                  <input type="checkbox" checked={filterFragile} onChange={(e) => setFilterFragile(e.target.checked)} />
-                  <span className="slider" />
-                </label>
-              </div>
-            </div>
-
-
-            {/* Labels switch */}
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
-              <div className="switch-container">
-                <span className="switch-label" style={{ fontWeight: "700" }}>Item IDs</span>
-                <label className="switch">
-                  <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
-                  <span className="slider" />
-                </label>
-              </div>
-            </div>
-
-            {/* Stop Select Dropdown */}
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "14px" }}>
-              <label className="form-label" style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase" }}>Stop</label>
-              <select
-                value={selectedStop}
-                onChange={(e) => setSelectedStop(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  background: "var(--bg-input)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "6px",
-                  color: "var(--text-main)",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  outline: "none",
-                  cursor: "pointer",
-                  transition: "border-color 0.15s ease"
-                }}
-              >
-                <option value="All">All</option>
-                {uniqueStops.map(stop => (
-                  <option key={stop} value={stop}>Stop {stop}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+        <div className="divider"></div>
+        <div className="section-tag">Labels</div>
+        <div className="constraint-row" style={{ borderBottom: "none" }}>
+          <span style={{ fontSize: "12.5px", fontWeight: 600 }}>Item IDs</span>
+          <label className="switch"><input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} /><span className="slider"></span></label>
         </div>
 
-        {/* Placement Details Card */}
-        <div style={{
-          background: "var(--bg-card)",
-          border: "1px solid var(--border)",
-          borderRadius: "12px",
-          padding: "24px",
-          boxShadow: "var(--shadow)",
-          minHeight: "180px",
-          display: "flex",
-          flexDirection: "column"
-        }}>
-          <h4 className="form-label" style={{ color: "var(--primary)", borderBottom: "1px solid var(--border)", paddingBottom: "8px", marginBottom: "16px", fontSize: "13px", fontWeight: "700" }}>
-            ● PLACEMENT DETAILS
-          </h4>
-          {selectedItemInfo ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "13px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-dim)" }}>Name:</span>
-                <span style={{ fontWeight: "700", color: "var(--text-main)" }}>{selectedItemInfo.id}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-dim)" }}>Coordinates:</span>
-                <span style={{ fontWeight: "700", color: "var(--text-main)" }}>({selectedItemInfo.x}, {selectedItemInfo.y}, {selectedItemInfo.z})</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-dim)" }}>Size (W×D×H):</span>
-                <span style={{ fontWeight: "700", color: "var(--text-main)" }}>{selectedItemInfo.l} × {selectedItemInfo.d} × {selectedItemInfo.h} cm</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-dim)" }}>Stop:</span>
-                <span style={{ fontWeight: "700", color: "var(--primary)" }}>Stop {selectedItemInfo.stop}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-dim)" }}>Weight:</span>
-                <span style={{ fontWeight: "700", color: "var(--text-main)" }}>{selectedItemInfo.weight} kg</span>
-              </div>
+        <div className="divider"></div>
+        <div className="section-tag">Stop Filter</div>
+        <div style={{ marginTop: "10px" }}>
+          <select value={selectedStop} onChange={(e) => setSelectedStop(e.target.value)}>
+            <option value="All">All Stops</option>
+            {uniqueStops.map(stop => (
+              <option key={stop} value={stop}>Stop {stop}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="divider"></div>
+        <div className="section-tag">Placement details</div>
+        <table style={{ fontSize: "12px", border: "none" }}>
+          <tbody>
+            <tr>
+              <td style={{ padding: "6px 0", border: "none" }}>Name</td>
+              <td style={{ padding: "6px 0", border: "none", textAlign: "right", fontWeight: 700 }}>{selectedItemInfo ? selectedItemInfo.id : "—"}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "6px 0", border: "none" }}>Coordinates</td>
+              <td style={{ padding: "6px 0", border: "none", textAlign: "right" }} className="mono">{selectedItemInfo ? `(${selectedItemInfo.x},${selectedItemInfo.y},${selectedItemInfo.z})` : "—"}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "6px 0", border: "none" }}>Size</td>
+              <td style={{ padding: "6px 0", border: "none", textAlign: "right" }} className="mono">{selectedItemInfo ? `${selectedItemInfo.l}×${selectedItemInfo.d}×${selectedItemInfo.h}` : "—"}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "6px 0", border: "none" }}>Weight</td>
+              <td style={{ padding: "6px 0", border: "none", textAlign: "right" }}>{selectedItemInfo ? `${selectedItemInfo.weight} kg` : "—"}</td>
+            </tr>
+          </tbody>
+        </table>
+        <style>{`.constraint-row{ display:flex; align-items:center; justify-content:space-between; padding:9px 2px; border-bottom:1px solid var(--border); }`}</style>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title">3D packing viewport</div>
+            <div className="card-desc">Updates dynamically during iteration loops</div>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => triggerViewReset("3D")}>Reset view</button>
+          </div>
+        </div>
+        <div style={{ minHeight: "450px", borderRadius: "var(--radius-md)", background: "var(--surface-sunken)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+          {isBenchmarking ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ display: "inline-block", width: 40, height: 40, border: "4px solid var(--primary)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "16px" }} />
+              <h4 style={{ color: "var(--text-main)", fontSize: "16px", fontWeight: "700" }}>Running Benchmark...</h4>
+              <p style={{ color: "var(--text-dim)", fontSize: "13px", marginTop: "4px" }}>Please wait while all 4 strategies are being evaluated in parallel.</p>
             </div>
+          ) : benchmarkResults ? (
+            <div style={{ width: "100%", padding: "24px" }}>
+              <h4 style={{ color: "var(--primary)", fontSize: "16px", fontWeight: "700", marginBottom: "20px" }}>Benchmark Results</h4>
+              <table className="custom-table" style={{ width: "100%", textAlign: "left" }}>
+                <thead>
+                  <tr>
+                    <th>Strategy</th>
+                    <th>Bins Used</th>
+                    <th>Space Utilization (%)</th>
+                    <th>Constraint Satisfaction (%)</th>
+                    <th>Runtime (s)</th>
+                    <th>Peak Memory (MB)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {benchmarkResults.map((res, idx) => (
+                    <tr key={idx}>
+                      <td style={{ fontWeight: "700", color: "var(--text-main)" }}>{res.strategy}</td>
+                      {res.error ? (
+                        <td colSpan="5" style={{ color: "var(--danger)" }}>Error: {res.error}</td>
+                      ) : (
+                        <>
+                          <td style={{ fontWeight: "700", color: "var(--primary)" }}>{res.bins_used}</td>
+                          <td>{res.su_pct}%</td>
+                          <td>{res.csr_pct}%</td>
+                          <td>{res.runtime_s}s</td>
+                          <td>{res.peak_mem_mb}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : filteredPlacements && instanceInfo ? (
+            <BinViewer
+              placements={filteredPlacements}
+              container={instanceInfo.container}
+              binsUsed={binsUsed}
+              showLabels={showLabels}
+              running={running}
+              orientation={viewportOrientation}
+              resetTrigger={viewportTrigger}
+              onResetView={() => triggerViewReset("3D")}
+              onHoverItem={setSelectedItemInfo}
+              onInteract={() => {
+                if (viewportOrientation !== "3D") {
+                  setViewportOrientation("3D");
+                }
+              }}
+            />
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, color: "var(--text-dim)", fontSize: "12px", textAlign: "center", border: "1px dashed var(--border)", borderRadius: "8px", padding: "16px" }}>
-              <span style={{ fontSize: "16px" }}>🔍</span>
-              <span style={{ marginTop: "6px" }}>Hover over a packed box to inspect details</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--ink-faint)", fontSize: "12px", textAlign: "center", padding: "16px" }}>
+              <span style={{ fontSize: "24px", marginBottom: "8px" }}>📦</span>
+              <span style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)" }}>No Active Run Data</span>
+              <span style={{ marginTop: "4px" }}>Start the optimizer from the Logistics tab to view output.</span>
             </div>
           )}
         </div>
-      </div>
-
-      {/* Viewport canvas on right */}
-      <div style={{ flex: "2 1 600px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <div>
-            <h3 style={{ fontSize: "16px", fontWeight: "700" }}>3-D Packing Viewport</h3>
-            <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>Updates dynamically during iteration loops. Use mouse controls to rotate/zoom.</span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="field-hint">Showing {filteredPlacements?.length || 0} items</span>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <span className="badge badge-neutral">{binsUsed || 0} bins</span>
+            <span className="badge badge-primary">{instanceInfo?.n_items || 0} items</span>
           </div>
         </div>
-
-        {isBenchmarking ? (
-          <div style={{ height: "450px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--bg-input)", borderRadius: "8px", border: "1px solid var(--border)" }}>
-            <span style={{ display: "inline-block", width: 40, height: 40, border: "4px solid var(--primary)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "16px" }} />
-            <h4 style={{ color: "var(--text-main)", fontSize: "16px", fontWeight: "700" }}>Running Benchmark...</h4>
-            <p style={{ color: "var(--text-dim)", fontSize: "13px", marginTop: "4px" }}>Please wait while all 4 strategies are being evaluated in parallel.</p>
-          </div>
-        ) : benchmarkResults ? (
-          <div style={{ background: "var(--bg-input)", borderRadius: "8px", border: "1px solid var(--border)", padding: "24px" }}>
-            <h4 style={{ color: "var(--primary)", fontSize: "16px", fontWeight: "700", marginBottom: "20px" }}>Benchmark Results</h4>
-            <table className="custom-table" style={{ width: "100%", textAlign: "left" }}>
-              <thead>
-                <tr>
-                  <th>Strategy</th>
-                  <th>Bins Used</th>
-                  <th>Space Utilization (%)</th>
-                  <th>Constraint Satisfaction (%)</th>
-                  <th>Runtime (s)</th>
-                  <th>Peak Memory (MB)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {benchmarkResults.map((res, idx) => (
-                  <tr key={idx}>
-                    <td style={{ fontWeight: "700", color: "var(--text-main)" }}>{res.strategy}</td>
-                    {res.error ? (
-                      <td colSpan="5" style={{ color: "var(--red)" }}>Error: {res.error}</td>
-                    ) : (
-                      <>
-                        <td style={{ fontWeight: "700", color: "var(--primary)" }}>{res.bins_used}</td>
-                        <td>{res.su_pct}%</td>
-                        <td>{res.csr_pct}%</td>
-                        <td>{res.runtime_s}s</td>
-                        <td>{res.peak_mem_mb}</td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : filteredPlacements && instanceInfo ? (
-          <BinViewer
-            placements={filteredPlacements}
-            container={instanceInfo.container}
-            binsUsed={binsUsed}
-            showLabels={showLabels}
-            running={running}
-            orientation={viewportOrientation}
-            resetTrigger={viewportTrigger}
-            onResetView={() => triggerViewReset("3D")}
-            onHoverItem={setSelectedItemInfo}
-            onInteract={() => {
-              if (viewportOrientation !== "3D") {
-                setViewportOrientation("3D");
-              }
-            }}
-          />
-        ) : (
-          <div style={{ height: "450px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--bg-input)", borderRadius: "8px", border: "1px solid var(--border)" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px" }}>📦</div>
-            <h4 style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>No Active Run Data</h4>
-            <p style={{ color: "var(--text-dim)", fontSize: "12px", marginTop: "4px" }}>Start the optimizer from the Logistics tab to view output.</p>
-          </div>
-        )}
       </div>
     </div>
   );

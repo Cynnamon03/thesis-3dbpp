@@ -37,13 +37,13 @@ export default function LoginPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "30px" }}>
           <img src={logoImg} alt="STACKR Logo" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "contain" }} />
           <div style={{ textAlign: "left" }}>
-            <h2 style={{ fontSize: "18px", fontWeight: "800", color: "var(--text-main)", lineHeight: 1.1 }}>STACKR</h2>
-            <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: "600" }}>3D Bin Packing Optimizer</span>
+            <h2 style={{ fontSize: "18px", fontWeight: "800", color: "var(--ink)", lineHeight: 1.1 }}>STACKR</h2>
+            <span style={{ fontSize: "11px", color: "var(--ink-faint)", fontWeight: "600" }}>3D Bin Packing Optimizer</span>
           </div>
         </div>
 
-        <h3 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text-main)", textAlign: "left", marginBottom: "4px" }}>Welcome back</h3>
-        <p style={{ fontSize: "13px", color: "var(--text-dim)", textAlign: "left", marginBottom: "28px" }}>Sign in to continue to the tool</p>
+        <h3 style={{ fontSize: "22px", fontWeight: "800", color: "var(--ink)", textAlign: "left", marginBottom: "4px" }}>Welcome back</h3>
+        <p style={{ fontSize: "13px", color: "var(--ink-faint)", textAlign: "left", marginBottom: "28px" }}>Sign in to continue to the tool</p>
         
         {err && (
           <div style={{
@@ -61,8 +61,8 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={submit}>
-          <div className="form-group">
-            <label className="form-label">Email address</label>
+          <div className="form-group" style={{ marginBottom: "16px" }}>
+            <label className="field-label">Email address</label>
             <div className="input-container">
               <span className="input-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -82,7 +82,7 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group" style={{ marginBottom: "28px" }}>
-            <label className="form-label">Password</label>
+            <label className="field-label">Password</label>
             <div className="input-container">
               <span className="input-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -101,12 +101,12 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <button type="submit" className="btn-primary" disabled={loading}>
+          <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "10px", fontSize: "14px" }} disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <p style={{ marginTop: "28px", fontSize: "13px", color: "var(--text-muted)", textAlign: "center" }}>
+        <p style={{ marginTop: "28px", fontSize: "13px", color: "var(--ink-soft)", textAlign: "center" }}>
           Don't have an account? <Link to="/register" style={{ color: "var(--primary)", fontWeight: "700", textDecoration: "none" }}>Register</Link>
         </p>
       </div>

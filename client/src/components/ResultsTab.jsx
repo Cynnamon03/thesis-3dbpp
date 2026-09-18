@@ -1,24 +1,5 @@
 import React from "react";
-import ConvergenceChart from "./ConvergenceChart";
-
-function StatChip({ label, value, color, subtitle }) {
-  return (
-    <div style={{
-      background: "var(--bg-card)",
-      border: "1px solid var(--border)",
-      borderRadius: "12px",
-      padding: "20px 24px",
-      flex: "1 1 calc(25% - 16px)",
-      boxShadow: "var(--shadow)",
-      transition: "transform 0.15s ease",
-      textAlign: "left"
-    }}>
-      <div style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-dim)" }}>{label}</div>
-      <div style={{ fontSize: "28px", fontWeight: "800", color: color || "var(--primary)", marginTop: "4px", lineHeight: 1.1 }}>{value}</div>
-      {subtitle && <div style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "4px" }}>{subtitle}</div>}
-    </div>
-  );
-}
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 
 export default function ResultsTab({
   finalResult,
@@ -31,185 +12,155 @@ export default function ResultsTab({
   handleExportResultsCSV,
   handleExportReport
 }) {
+  if (!finalResult) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "50vh", color: "var(--ink-faint)" }}>
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: "16px" }}>
+          <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+        </svg>
+        <div style={{ fontSize: "16px", fontWeight: 600, color: "var(--ink)" }}>No results to display</div>
+        <div style={{ fontSize: "13px", marginTop: "4px" }}>Run an optimization in the Logistics tab to see results here.</div>
+      </div>
+    );
+  }
+
+  const { metrics } = finalResult;
+  const m1 = metrics?.M1_space_utilization_pct || 0;
+  const m2 = metrics?.M2_constraint_satisfaction_pct || 0;
+  const m3 = metrics?.M3_execution_time_s || finalResult.runtime_s || 0;
+  const m4 = metrics?.M4_peak_memory_mb || 0;
+  const m5 = metrics?.M5_robustness || 0;
+
+  // Thesis scoring heuristic
+  const isPerfectCompliance = m2 === 100;
+  const isGoodSpace = m1 > 40;
+  let scoreClass = isPerfectCompliance ? "badge-safe" : (m2 > 50 ? "badge-warn" : "badge-danger");
+  let scoreText = isPerfectCompliance ? "Optimal" : (m2 > 50 ? "Acceptable" : "Critical Failure");
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-      
-      {/* Top row header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <h3 style={{ fontSize: "18px", fontWeight: "800" }}>Metrics Panel</h3>
-          <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>Compare visual layout achievements with mathematical bounds.</span>
-        </div>
-        {finalResult && (
-          <span style={{
-            padding: "6px 14px",
-            background: "var(--primary-light)",
-            border: "1px solid var(--border)",
-            borderRadius: "20px",
-            fontSize: "12px",
-            fontWeight: "700",
-            color: "var(--primary)"
-          }}>
-            Run #{String(runHistory.length).padStart(3, "0")} - {strategy}
-          </span>
-        )}
+    <>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "18px" }}>
+        <div className="card-desc" style={{ margin: 0 }}>Final optimization metrics based on thesis SOP requirements.</div>
+        <span className="badge badge-primary">Current Run — {strategy}</span>
       </div>
 
-      {/* Run Progress Live Bar */}
-      {stats && !finalResult && (
-        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "10px", padding: "16px 20px", boxShadow: "var(--shadow)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", marginBottom: "8px" }}>
-            <span>Optimization Loop Progress</span>
-            <span>{stats.iteration} / {stats.maxIter} Iterations</span>
-          </div>
-          <div style={{ height: "8px", background: "var(--bg-input)", borderRadius: "4px", overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${(stats.iteration / stats.maxIter) * 100}%`, background: "linear-gradient(90deg, var(--primary), #a78bfa)", transition: "width 0.3s ease" }} />
-          </div>
+      <div className="grid grid-4" style={{ marginBottom: "20px" }}>
+        <div className="card">
+          <div className="card-desc" style={{ margin: 0 }}>M-1: Space Utilization</div>
+          <div className="font-display" style={{ fontSize: "26px", fontWeight: 600, marginTop: "6px" }}>{m1.toFixed(2)}%</div>
+          <div className="field-hint">Percent of container volume filled</div>
         </div>
-      )}
-
-      {/* RESULTS METRICS CHIPS */}
-      {finalResult ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          
-          {/* Four Summary Cards */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
-            <StatChip label="M-1: Space Utilization" value={`${(finalResult.metrics?.M1_space_utilization_pct || 0).toFixed(1)}%`} color="var(--primary)" subtitle="Volume packed vs Bin Capacity" />
-            <StatChip label="M-2: Constraint Satisfaction" value={`${(finalResult.metrics?.M2_constraint_satisfaction_pct || 0).toFixed(1)}%`} color={finalResult.metrics?.M2_constraint_satisfaction_pct === 100 ? "var(--green)" : "var(--amber)"} subtitle="C1-C6 Strict Adherence" />
-            <StatChip label="M-3: Execution Time" value={`${(finalResult.metrics?.M3_execution_time_ms / 1000 || finalResult.runtime_s).toFixed(2)}s`} color="var(--text-muted)" subtitle={`${maxIter} iterations`} />
-            <StatChip label="M-4: Peak Memory" value={`${(finalResult.metrics?.M4_peak_memory_mb || 0).toFixed(2)} MB`} color="var(--text-muted)" subtitle="RAM Footprint" />
+        <div className="card">
+          <div className="card-desc" style={{ margin: 0 }}>M-2: Constraint Satisfaction</div>
+          <div className="font-display" style={{ fontSize: "26px", fontWeight: 600, marginTop: "6px", color: isPerfectCompliance ? "var(--safe)" : "var(--danger)" }}>
+            {m2.toFixed(2)}%
           </div>
+          <div className="field-hint">Percentage of placement rules satisfied</div>
+        </div>
+        <div className="card">
+          <div className="card-desc" style={{ margin: 0 }}>M-3: Execution Time</div>
+          <div className="font-display" style={{ fontSize: "26px", fontWeight: 600, marginTop: "6px" }}>{m3.toFixed(2)}s</div>
+          <div className="field-hint">{stats ? stats.iteration : maxIter} solver cycles</div>
+        </div>
+        <div className="card">
+          <div className="card-desc" style={{ margin: 0 }}>M-4: Peak Memory</div>
+          <div className="font-display" style={{ fontSize: "26px", fontWeight: 600, marginTop: "6px" }}>{m4.toFixed(2)} MB</div>
+          <div className="field-hint">Maximum RAM footprint</div>
+        </div>
+      </div>
 
-          {/* Main columns: Left Metrics Summary, Right Axis & Chart */}
-          <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-start" }}>
-            
-            {/* Left Column (Metrics Summary) */}
-            <div style={{ flex: "1 1 380px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
-              <h4 className="form-label" style={{ color: "var(--primary)", borderBottom: "1px solid var(--border)", paddingBottom: "8px", marginBottom: "20px" }}>
-                Metrics summary
-              </h4>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-1: Space Utilization</span>
-                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{(finalResult.metrics?.M1_space_utilization_pct || 0).toFixed(2)}%</span>
-                </div>
-                
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-2: Constraint Satisfaction</span>
-                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{(finalResult.metrics?.M2_constraint_satisfaction_pct || 0).toFixed(2)}%</span>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-3: Execution Time (ms)</span>
-                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{(finalResult.metrics?.M3_execution_time_ms || 0).toFixed(1)} ms</span>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-4: Peak Memory (MB)</span>
-                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{(finalResult.metrics?.M4_peak_memory_mb || 0).toFixed(2)} MB</span>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-5: Robustness (Std Dev)</span>
-                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{finalResult.metrics?.M5_robustness_su_std !== null ? finalResult.metrics?.M5_robustness_su_std.toFixed(3) : "N/A (Single run)"}</span>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>Bins Used</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontWeight: "700", color: "var(--primary)", fontSize: "14px" }}>{finalResult.bins_used}</span>
-                    <span className="badge badge-standard">LB: {finalResult.lower_bound}</span>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>Optimality gap</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{finalResult.gap_pct.toFixed(1)}%</span>
-                    <span className={`badge badge-${finalResult.gap_pct === 0 ? 'success' : 'fragile'}`}>
-                      {finalResult.gap_pct === 0 ? 'Optimal' : 'Moderate'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column (Axis utilization & Convergence Curve) */}
-            <div style={{ flex: "2 1 500px", display: "flex", flexDirection: "column", gap: "20px" }}>
-              
-              {/* Axis utilization Card */}
-              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
-                <h4 className="form-label" style={{ color: "var(--primary)", borderBottom: "1px solid var(--border)", paddingBottom: "8px", marginBottom: "16px" }}>
-                  Axis utilization
-                </h4>
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", marginBottom: "6px" }}>
-                      <span>X-axis</span>
-                      <span>{axisUtil.x}%</span>
-                    </div>
-                    <div style={{ height: "8px", background: "var(--bg-input)", borderRadius: "4px", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${axisUtil.x}%`, backgroundColor: "var(--primary)" }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", marginBottom: "6px" }}>
-                      <span>Y-axis</span>
-                      <span>{axisUtil.y}%</span>
-                    </div>
-                    <div style={{ height: "8px", background: "var(--bg-input)", borderRadius: "4px", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${axisUtil.y}%`, backgroundColor: "var(--green)" }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", marginBottom: "6px" }}>
-                      <span>Z-axis</span>
-                      <span>{axisUtil.z}%</span>
-                    </div>
-                    <div style={{ height: "8px", background: "var(--bg-input)", borderRadius: "4px", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${axisUtil.z}%`, backgroundColor: "var(--amber)" }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Convergence Card */}
-              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <h4 className="form-label" style={{ color: "var(--primary)", borderBottom: "1px solid var(--border)", paddingBottom: "8px", marginBottom: "0" }}>
-                    CONVERGENCE CURVE
-                  </h4>
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <button
-                      onClick={handleExportResultsCSV}
-                      style={{ padding: "6px 12px", background: "transparent", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px", fontWeight: "700", color: "var(--text-muted)", cursor: "pointer" }}
-                    >
-                      Export CSV
-                    </button>
-                    <button
-                      onClick={handleExportReport}
-                      style={{ padding: "6px 12px", background: "var(--primary)", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: "700", color: "#ffffff", cursor: "pointer" }}
-                    >
-                      Export report
-                    </button>
-                  </div>
-                </div>
-                <ConvergenceChart data={chartData} lowerBound={finalResult.lower_bound} />
-              </div>
-
+      <div className="grid grid-2" style={{ alignItems: "start", marginBottom: "20px" }}>
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <div className="card-title">Safety &amp; delivery-order checks</div>
+              <div className="card-desc">Does the packing plan follow the rules that keep cargo safe and easy to unload?</div>
             </div>
           </div>
-
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <div className="compliance-row">
+              <span>Stays under weight limit (C3)</span>
+              <span className={`badge ${metrics?.details?.C3_weight_pct === 100 ? "badge-safe" : "badge-danger"}`}>
+                {metrics?.details?.C3_weight_pct === 100 ? "Passed" : "Failed"}
+              </span>
+            </div>
+            <div className="compliance-row">
+              <span>Fragile items protected (C4)</span>
+              <span className={`badge ${metrics?.details?.C4_fragility_pct === 100 ? "badge-safe" : "badge-danger"}`}>
+                {metrics?.details?.C4_fragility_pct === 100 ? "Passed" : "Failed"}
+              </span>
+            </div>
+            <div className="compliance-row">
+              <span>Load is stable, won't tip (C5)</span>
+              <span className={`badge ${metrics?.details?.C5_balance_pct === 100 ? "badge-safe" : "badge-danger"}`}>
+                {metrics?.details?.C5_balance_pct === 100 ? "Passed" : "Failed"}
+              </span>
+            </div>
+            <div className="compliance-row" style={{ borderBottom: "none" }}>
+              <span>Items unload in the right order (C6)</span>
+              <span className={`badge ${metrics?.details?.C6_stop_order_pct === 100 ? "badge-safe" : "badge-danger"}`}>
+                {metrics?.details?.C6_stop_order_pct === 100 ? "Passed" : "Failed"}
+              </span>
+            </div>
+          </div>
+          <style>{`.compliance-row{ display:flex; align-items:center; justify-content:space-between; padding:11px 2px; border-bottom:1px solid var(--border); font-size:12.5px; font-weight:600; }`}</style>
+          <div className="field-hint" style={{ marginTop: "12px" }}>
+            The Repair-Based Hybrid actively enforces these checks, whereas Standard heuristics do not guarantee safety.
+          </div>
         </div>
-      ) : (
-        <div style={{ padding: "40px", textAlign: "center", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px" }}>
-          <span style={{ fontSize: "28px" }}>📊</span>
-          <h4 style={{ marginTop: "12px", color: "var(--text-muted)" }}>No Results Available</h4>
-          <p style={{ fontSize: "13px", color: "var(--text-dim)", marginTop: "4px" }}>Start the optimizer execution to compile and render metrics.</p>
-        </div>
-      )}
 
-    </div>
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <div className="card-title">Score summary</div>
+              <div className="card-desc">A quick read on how good this run was, all factors combined</div>
+            </div>
+          </div>
+          <table>
+            <tbody>
+              <tr><td>Overall assessment</td><td style={{ textAlign: "right" }}><span className={`badge ${scoreClass}`}>{scoreText}</span></td></tr>
+              <tr><td>Space efficiency (M-1)</td><td style={{ textAlign: "right" }} className="mono">{m1.toFixed(2)}%</td></tr>
+              <tr><td>Constraint satisfaction (M-2)</td><td style={{ textAlign: "right" }} className="mono">{m2.toFixed(2)}%</td></tr>
+              <tr><td>Result reliability (M-5)</td><td style={{ textAlign: "right" }} className="mono">Variance: {m5.toFixed(3)}</td></tr>
+              <tr><td>Axis utilization (X / Y / Z)</td><td style={{ textAlign: "right" }} className="mono">{axisUtil.x}% / {axisUtil.y}% / {axisUtil.z}%</td></tr>
+              <tr><td>Total Bins Used</td><td style={{ textAlign: "right" }} className="mono">{finalResult.bins_used}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title">Convergence History</div>
+            <div className="card-desc">Fitness optimization trace across {stats?.iteration || maxIter} iterations</div>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button className="btn btn-secondary btn-sm" onClick={handleExportResultsCSV}>Export CSV</button>
+            <button className="btn btn-primary btn-sm" onClick={handleExportReport}>Export report</button>
+          </div>
+        </div>
+        <div style={{ width: "100%", height: "200px" }}>
+          <ResponsiveContainer>
+            <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+              <XAxis dataKey="iter" tick={{ fontSize: 11, fill: "var(--ink-faint)" }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--ink-faint)" }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--ink-faint)" }} axisLine={false} tickLine={false} />
+              <Tooltip 
+                contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px", color: "var(--ink)" }}
+                itemStyle={{ color: "var(--ink)" }}
+              />
+              <Line yAxisId="left" type="stepAfter" dataKey="bins" stroke="var(--primary)" strokeWidth={2} dot={false} name="Bins Used" />
+              <Line yAxisId="right" type="monotone" dataKey="composite" stroke="var(--blush)" strokeWidth={2} dot={false} name="Fitness" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{ display: "flex", gap: "18px", fontSize: "11.5px", color: "var(--ink-faint)", marginTop: "14px" }}>
+          <span><span style={{ display: "inline-block", width: "10px", height: "2px", background: "var(--primary)", marginRight: "5px" }}></span>Bins used (Left Axis)</span>
+          <span><span style={{ display: "inline-block", width: "10px", height: "2px", background: "var(--blush)", marginRight: "5px" }}></span>Fitness score (Right Axis)</span>
+        </div>
+      </div>
+    </>
   );
 }
