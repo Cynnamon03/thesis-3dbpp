@@ -538,7 +538,7 @@ export default function Shell() {
 
         <main className="content">
           <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
-            <DashboardTab />
+            <DashboardTab runHistory={runHistory} setActiveTab={setActiveTab} />
           </div>
 
           <div style={{ display: activeTab === 'logistics' ? 'block' : 'none' }}>
@@ -594,7 +594,7 @@ export default function Shell() {
           </div>
 
           <div style={{ display: activeTab === 'compare' ? 'block' : 'none' }}>
-            <CompareTab />
+            <CompareTab runHistory={runHistory} />
           </div>
 
           <div style={{ display: activeTab === 'visualization' ? 'block' : 'none' }}>
@@ -618,7 +618,7 @@ export default function Shell() {
           </div>
 
           <div style={{ display: activeTab === 'account' ? 'block' : 'none' }}>
-            <AccountTab />
+            <AccountTab user={user} logout={logout} />
           </div>
         </main>
       </div>

@@ -9,12 +9,19 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  async function fetchUser() {
+    try {
+      const data = await authApi.getMe();
+      setUser(data);
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    authApi
-      .getMe()
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+    fetchUser();
   }, []);
 
   async function login(email, password) {
@@ -36,7 +43,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthCtx.Provider value={{ user, loading, login, register, logout }}>
+    <AuthCtx.Provider value={{ user, loading, login, register, logout, fetchUser }}>
       {children}
     </AuthCtx.Provider>
   );

@@ -107,6 +107,27 @@ class MockStatement {
       saveData(data);
       return { lastInsertRowid: id };
     }
+    // 3. UPDATE users SET name = ?, pass_hash = ? WHERE id = ?
+    if (this.sql.includes("UPDATE users SET name = ?, pass_hash = ? WHERE id = ?")) {
+      const [name, pass_hash, id] = params;
+      const userIndex = data.users.findIndex(u => u.id === parseInt(id, 10));
+      if (userIndex !== -1) {
+        data.users[userIndex].name = name;
+        data.users[userIndex].pass_hash = pass_hash;
+        saveData(data);
+      }
+      return { changes: userIndex !== -1 ? 1 : 0 };
+    }
+    // 4. UPDATE users SET name = ? WHERE id = ?
+    if (this.sql.includes("UPDATE users SET name = ? WHERE id = ?")) {
+      const [name, id] = params;
+      const userIndex = data.users.findIndex(u => u.id === parseInt(id, 10));
+      if (userIndex !== -1) {
+        data.users[userIndex].name = name;
+        saveData(data);
+      }
+      return { changes: userIndex !== -1 ? 1 : 0 };
+    }
     return { lastInsertRowid: 0 };
   }
 

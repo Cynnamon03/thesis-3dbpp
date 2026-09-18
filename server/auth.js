@@ -66,6 +66,24 @@ router.get("/me", authRequired, (req, res) => {
   res.json(u);
 });
 
+router.put("/me", authRequired, (req, res) => {
+  const { name, password } = req.body || {};
+  if (!name) return res.status(400).json({ error: "Name is required" });
+
+  if (password) {
+    const hash = bcrypt.hashSync(password, 10);
+    db.prepare("UPDATE users SET name = ?, pass_hash = ? WHERE id = ?").run(name, hash, req.user.id);
+  } else {
+    db.prepare("UPDATE users SET name = ? WHERE id = ?").run(name, req.user.id);
+  }
+
+  const u = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  res
+    .cookie(COOKIE, sign(u), { httpOnly: true, sameSite: "lax", maxAge: 7 * 864e5 })
+    .json({ id: u.id, email: u.email, name: u.name, role: u.role });
+});
+
+
 router.get("/runs", authRequired, (req, res) => {
   const rows = db
     .prepare("SELECT * FROM runs WHERE user_id = ? ORDER BY id DESC LIMIT 100")
