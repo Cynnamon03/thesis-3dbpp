@@ -42,6 +42,9 @@ export default function Shell() {
   const [rotationConstraint, setRotationConstraint] = useState(true);
   const [lifoConstraint, setLifoConstraint] = useState(false);
 
+  // Track which option is active: "A" = manual, "B" = OR-Library
+  const [activeOption, setActiveOption] = useState("A");
+
   // WebSocket & Live optimization run states
   const [wsConnected, setWsConnected] = useState(false);
   const [running, setRunning] = useState(false);
@@ -58,6 +61,10 @@ export default function Shell() {
 
   // Run History
   const [runHistory, setRunHistory] = useState([]);
+
+  // Benchmark State
+  const [isBenchmarking, setIsBenchmarking] = useState(false);
+  const [benchmarkResults, setBenchmarkResults] = useState(null);
 
   const wsRef = useRef(null);
   const reconnectRef = useRef(null);
@@ -172,8 +179,25 @@ export default function Shell() {
         }).then(() => fetchRunHistory()).catch(() => {});
         break;
 
+      case "benchmark_start":
+        setIsBenchmarking(true);
+        setBenchmarkResults(null);
+        setActiveTab("visualization");
+        break;
+
+      case "benchmark_complete":
+        setIsBenchmarking(false);
+        setBenchmarkResults(msg.results);
+        break;
+
+      case "benchmark_closed":
+        setIsBenchmarking(false);
+        if (msg.code !== 0) setError(`Benchmark process exited with code ${msg.code}`);
+        break;
+
       case "stopped":
         setRunning(false);
+        setIsBenchmarking(false);
         break;
 
       case "run_closed":
@@ -256,7 +280,7 @@ export default function Shell() {
       try {
         const data = await instancesApi.saveCustom({
           container: containerSpecs,
-          items: itemsList
+          items: activeOption === "A" ? itemsList : instanceItems
         });
         if (data.path) {
           runPath = data.path;
@@ -272,7 +296,32 @@ export default function Shell() {
 
     wsRef.current.send(JSON.stringify({ action: "run", instancePath: runPath, maxTime, strategy }));
     setActiveTab("visualization");
-  }, [selected, running, wsConnected, maxTime, isCustomized, containerSpecs, itemsList, strategy]);
+  }, [selected, running, wsConnected, maxTime, isCustomized, containerSpecs, itemsList, instanceItems, activeOption, strategy]);
+
+  const handleBenchmarkRun = useCallback(async () => {
+    if (isBenchmarking || !wsConnected) return;
+    setIsBenchmarking(true);
+    setBenchmarkResults(null);
+    setError(null);
+
+    let runPath = selected;
+    if (isCustomized || !selected) {
+      try {
+        const data = await instancesApi.saveCustom({ 
+          container: containerSpecs, 
+          items: activeOption === "A" ? itemsList : instanceItems 
+        });
+        if (data.path) runPath = data.path;
+        else throw new Error(data.error || "Failed to compile custom configuration");
+      } catch (err) {
+        setError(err.message);
+        setIsBenchmarking(false);
+        return;
+      }
+    }
+    wsRef.current.send(JSON.stringify({ action: "benchmark", instancePath: runPath, maxTime }));
+    setActiveTab("visualization");
+  }, [selected, isBenchmarking, wsConnected, maxTime, isCustomized, containerSpecs, itemsList, instanceItems, activeOption]);
 
   const handleStopRun = useCallback(() => {
     wsRef.current?.send(JSON.stringify({ action: "stop" }));
@@ -537,7 +586,11 @@ export default function Shell() {
           elapsed={elapsed}
           handleStartRun={handleStartRun}
           handleStopRun={handleStopRun}
+          handleBenchmarkRun={handleBenchmarkRun}
+          isBenchmarking={isBenchmarking}
           canRun={canRun}
+          activeOption={activeOption}
+          setActiveOption={setActiveOption}
         />
       )}
 
@@ -564,6 +617,8 @@ export default function Shell() {
           instanceInfo={instanceInfo}
           binsUsed={binsUsed}
           running={running}
+          isBenchmarking={isBenchmarking}
+          benchmarkResults={benchmarkResults}
         />
       )}
 

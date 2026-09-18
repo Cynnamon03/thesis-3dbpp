@@ -22,7 +22,7 @@ import argparse
 import tracemalloc
 
 from instance_reader import load_instance
-from geometry_3d     import assign_weights, compute_weight_capacity
+from geometry_3d     import compute_weight_capacity
 from wolf_3d         import hd_gwo_3d
 from metrics  import (space_utilization,
                              constraint_satisfaction_rate,
@@ -31,7 +31,7 @@ from metrics  import (space_utilization,
 
 def run_instance(path, pop, max_iter, max_time, runs):
     container, items = load_instance(path)
-    assign_weights(items, seed=42)             # controlled variable: fixed weights
+
     weight_cap = compute_weight_capacity(items, container)
 
     su_list, csr_list, et_list, pm_list = [], [], [], []

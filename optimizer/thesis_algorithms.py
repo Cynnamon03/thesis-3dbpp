@@ -5,7 +5,7 @@ import sys
 import numpy as np
 
 from thesis_math import decode_position
-from thesis_metrics import assign_thesis_attributes, evaluate_constraints, space_utilization
+from thesis_metrics import evaluate_constraints, space_utilization
 from geometry_3d import place_bin_dblf, get_dims
 
 class WolfContinuous:
@@ -99,14 +99,14 @@ class WolfContinuous:
                         violating_items.update(boxes_above)
                         
                     # R2 (Weight): Remove items if cumulative mass > LBS
-                    cumulative_weight = sum(items[j].get('weight', 1) for j in boxes_above)
+                    cumulative_weight = sum(items[j].get('Weight', items[j].get('weight', 1)) for j in boxes_above)
                     if cumulative_weight > items[i].get('LBS', float('inf')):
                         # Sort boxes_above by mass descending to remove heaviest first
-                        boxes_above.sort(key=lambda j: items[j].get('weight', 1), reverse=True)
+                        boxes_above.sort(key=lambda j: items[j].get('Weight', items[j].get('weight', 1)), reverse=True)
                         removed_weight = 0
                         for j in boxes_above:
                             violating_items.add(j)
-                            removed_weight += items[j].get('weight', 1)
+                            removed_weight += items[j].get('Weight', items[j].get('weight', 1))
                             if cumulative_weight - removed_weight <= items[i].get('LBS', float('inf')):
                                 break
                                 
@@ -194,8 +194,7 @@ class ThesisOptimizerBase:
         self.stream_cb = stream_cb
         self.n = len(items)
         
-        # Ensure LBS, Fragile, Stop, Weight are present
-        assign_thesis_attributes(self.items)
+
 
 class StandaloneDGWO(ThesisOptimizerBase):
     def run(self):

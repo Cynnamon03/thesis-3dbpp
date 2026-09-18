@@ -86,7 +86,7 @@ def place_bin_dblf(item_indices, items, orient_ids, container, weight_capacity=N
         item = items[item_idx]
         orient_id = orient_ids.get(item_idx, 0)
         l, h, d   = get_dims(item, orient_id)
-        wt        = item.get('weight', 1)
+        wt        = item.get('Weight', item.get('weight', 1))
 
         if weight_capacity is not None and total_wt + wt > weight_capacity:
             overflow.append(item_idx)
@@ -123,14 +123,9 @@ def place_bin_dblf(item_indices, items, orient_ids, container, weight_capacity=N
 
     return placements, overflow
 
-# ── Weight helpers ────────────────────────────────────────────────────────────
-def assign_weights(items, seed=42):
-    rng = random.Random(seed)
-    for item in items:
-        item['weight'] = rng.randint(1, 20)
 
 def compute_weight_capacity(items, container):
-    total_wt  = sum(item.get('weight', 1) for item in items)
+    total_wt  = sum(item.get('Weight', item.get('weight', 1)) for item in items)
     vol_cap   = container['L'] * container['H'] * container['D']
     vol_items = sum(i['L'] * i['H'] * i['D'] for i in items)
     lb        = max(1, math.ceil(vol_items / vol_cap))

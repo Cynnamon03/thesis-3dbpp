@@ -74,10 +74,10 @@ export default function ResultsTab({
           
           {/* Four Summary Cards */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
-            <StatChip label="Space Utilization" value={`${(finalResult.metrics?.M1_space_utilization_pct || finalResult.volume_util_pct).toFixed(1)}%`} color="var(--primary)" subtitle="NAB score" />
-            <StatChip label="Optimality Gap" value={`${finalResult.gap_pct.toFixed(1)}%`} color={finalResult.gap_pct === 0 ? "var(--green)" : "var(--amber)"} subtitle="vs. lower bound" />
-            <StatChip label="Dissipation D(X)" value={finalResult.dissipation.toFixed(3)} color="var(--text-muted)" subtitle="C1=C2=0.5" />
-            <StatChip label="Runtime" value={`${finalResult.runtime_s.toFixed(1)}s`} color="var(--text-muted)" subtitle={`${maxIter} iterations`} />
+            <StatChip label="M-1: Space Utilization" value={`${(finalResult.metrics?.M1_space_utilization_pct || 0).toFixed(1)}%`} color="var(--primary)" subtitle="Volume packed vs Bin Capacity" />
+            <StatChip label="M-2: Constraint Satisfaction" value={`${(finalResult.metrics?.M2_constraint_satisfaction_pct || 0).toFixed(1)}%`} color={finalResult.metrics?.M2_constraint_satisfaction_pct === 100 ? "var(--green)" : "var(--amber)"} subtitle="C1-C6 Strict Adherence" />
+            <StatChip label="M-3: Execution Time" value={`${(finalResult.metrics?.M3_execution_time_ms / 1000 || finalResult.runtime_s).toFixed(2)}s`} color="var(--text-muted)" subtitle={`${maxIter} iterations`} />
+            <StatChip label="M-4: Peak Memory" value={`${(finalResult.metrics?.M4_peak_memory_mb || 0).toFixed(2)} MB`} color="var(--text-muted)" subtitle="RAM Footprint" />
           </div>
 
           {/* Main columns: Left Metrics Summary, Right Axis & Chart */}
@@ -91,16 +91,36 @@ export default function ResultsTab({
               
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>Composite score</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{finalResult.composite_score.toFixed(3)}</span>
-                    <span className="badge badge-success">Good</span>
-                  </div>
+                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-1: Space Utilization</span>
+                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{(finalResult.metrics?.M1_space_utilization_pct || 0).toFixed(2)}%</span>
                 </div>
                 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>NAB (space fill)</span>
-                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{((finalResult.metrics?.M1_space_utilization_pct || finalResult.volume_util_pct) / 100).toFixed(3)}</span>
+                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-2: Constraint Satisfaction</span>
+                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{(finalResult.metrics?.M2_constraint_satisfaction_pct || 0).toFixed(2)}%</span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-3: Execution Time (ms)</span>
+                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{(finalResult.metrics?.M3_execution_time_ms || 0).toFixed(1)} ms</span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-4: Peak Memory (MB)</span>
+                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{(finalResult.metrics?.M4_peak_memory_mb || 0).toFixed(2)} MB</span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>M-5: Robustness (Std Dev)</span>
+                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{finalResult.metrics?.M5_robustness_su_std !== null ? finalResult.metrics?.M5_robustness_su_std.toFixed(3) : "N/A (Single run)"}</span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
+                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>Bins Used</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontWeight: "700", color: "var(--primary)", fontSize: "14px" }}>{finalResult.bins_used}</span>
+                    <span className="badge badge-standard">LB: {finalResult.lower_bound}</span>
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -111,21 +131,6 @@ export default function ResultsTab({
                       {finalResult.gap_pct === 0 ? 'Optimal' : 'Moderate'}
                     </span>
                   </div>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>Fragility violations</span>
-                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>0</span>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>LIFO violations</span>
-                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>0</span>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "14px", fontWeight: "600" }}>CV (consistency)</span>
-                  <span style={{ fontWeight: "700", color: "var(--text-main)", fontSize: "14px" }}>{(finalResult.metrics?.M5_robustness_su_std || 0.021).toFixed(3)}</span>
                 </div>
               </div>
             </div>

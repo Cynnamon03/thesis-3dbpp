@@ -21,7 +21,7 @@ import argparse
 import time
 
 from instance_reader import load_instance
-from geometry_3d     import assign_weights, compute_weight_capacity
+from geometry_3d     import compute_weight_capacity
 from wolf_3d         import hd_gwo_3d
 
 try:
@@ -42,7 +42,7 @@ def run_one(instance_path, pop_size, max_iter, max_time, compare=False):
     n  = len(items)
     lb = lower_bound_3d(items, container)
 
-    assign_weights(items, seed=42)
+
     wt_cap = compute_weight_capacity(items, container)
 
     print(f"\nInstance : {instance_path}", file=sys.stderr, flush=True)

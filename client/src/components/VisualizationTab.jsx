@@ -6,14 +6,16 @@ export default function VisualizationTab({
   itemsList,
   instanceInfo,
   binsUsed,
-  running
+  running,
+  isBenchmarking,
+  benchmarkResults
 }) {
   // Visualization Control states (encapsulated locally)
   const [viewportOrientation, setViewportOrientation] = useState("3D");
   const [viewportTrigger, setViewportTrigger] = useState(0);
   const [filterStandard, setFilterStandard] = useState(true);
   const [filterFragile, setFilterFragile] = useState(true);
-  const [filterHeavy, setFilterHeavy] = useState(true);
+
   const [showLabels, setShowLabels] = useState(false);
   const [selectedStop, setSelectedStop] = useState("All");
   const [selectedItemInfo, setSelectedItemInfo] = useState(null);
@@ -43,10 +45,9 @@ export default function VisualizationTab({
       const type = origItem ? origItem.Type : (p.type || "Standard");
       if (type === "Standard") return filterStandard;
       if (type === "Fragile") return filterFragile;
-      if (type === "Heavy") return filterHeavy;
       return true;
     });
-  }, [placements, itemsList, filterStandard, filterFragile, filterHeavy, selectedStop]);
+  }, [placements, itemsList, filterStandard, filterFragile, selectedStop]);
 
   return (
     <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -107,14 +108,8 @@ export default function VisualizationTab({
                   <span className="slider" />
                 </label>
               </div>
-              <div className="switch-container">
-                <span className="switch-label">Heavy</span>
-                <label className="switch">
-                  <input type="checkbox" checked={filterHeavy} onChange={(e) => setFilterHeavy(e.target.checked)} />
-                  <span className="slider" />
-                </label>
-              </div>
             </div>
+
 
             {/* Labels switch */}
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
@@ -211,7 +206,47 @@ export default function VisualizationTab({
           </div>
         </div>
 
-        {filteredPlacements && instanceInfo ? (
+        {isBenchmarking ? (
+          <div style={{ height: "450px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--bg-input)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+            <span style={{ display: "inline-block", width: 40, height: 40, border: "4px solid var(--primary)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "16px" }} />
+            <h4 style={{ color: "var(--text-main)", fontSize: "16px", fontWeight: "700" }}>Running Benchmark...</h4>
+            <p style={{ color: "var(--text-dim)", fontSize: "13px", marginTop: "4px" }}>Please wait while all 4 strategies are being evaluated in parallel.</p>
+          </div>
+        ) : benchmarkResults ? (
+          <div style={{ background: "var(--bg-input)", borderRadius: "8px", border: "1px solid var(--border)", padding: "24px" }}>
+            <h4 style={{ color: "var(--primary)", fontSize: "16px", fontWeight: "700", marginBottom: "20px" }}>Benchmark Results</h4>
+            <table className="custom-table" style={{ width: "100%", textAlign: "left" }}>
+              <thead>
+                <tr>
+                  <th>Strategy</th>
+                  <th>Bins Used</th>
+                  <th>Space Utilization (%)</th>
+                  <th>Constraint Satisfaction (%)</th>
+                  <th>Runtime (s)</th>
+                  <th>Peak Memory (MB)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {benchmarkResults.map((res, idx) => (
+                  <tr key={idx}>
+                    <td style={{ fontWeight: "700", color: "var(--text-main)" }}>{res.strategy}</td>
+                    {res.error ? (
+                      <td colSpan="5" style={{ color: "var(--red)" }}>Error: {res.error}</td>
+                    ) : (
+                      <>
+                        <td style={{ fontWeight: "700", color: "var(--primary)" }}>{res.bins_used}</td>
+                        <td>{res.su_pct}%</td>
+                        <td>{res.csr_pct}%</td>
+                        <td>{res.runtime_s}s</td>
+                        <td>{res.peak_mem_mb}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : filteredPlacements && instanceInfo ? (
           <BinViewer
             placements={filteredPlacements}
             container={instanceInfo.container}

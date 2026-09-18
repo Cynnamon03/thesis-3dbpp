@@ -30,12 +30,13 @@ export default function LogisticsTab({
   elapsed,
   handleStartRun,
   handleStopRun,
-  canRun
+  handleBenchmarkRun,
+  isBenchmarking,
+  canRun,
+  activeOption,
+  setActiveOption
 }) {
   const fileInputRef = useRef(null);
-
-  // Track which option is active: "A" = manual, "B" = OR-Library
-  const [activeOption, setActiveOption] = useState("A");
 
   // New Item Input states (encapsulated locally)
   const [newItemId, setNewItemId] = useState("BOX-001");
@@ -242,10 +243,10 @@ export default function LogisticsTab({
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div>
                 <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>
-                  Hybrid strategy
+                  Algorithm strategy
                 </label>
                 <div style={{ display: "flex", gap: "6px" }}>
-                  {["Sequential", "Repair-based"].map((s) => (
+                  {["DGWO", "MOGWO", "SEQ", "REP"].map((s) => (
                     <button
                       key={s}
                       onClick={() => setStrategy(s)}
@@ -273,17 +274,19 @@ export default function LogisticsTab({
                 </div>
               </div>
               <div style={{ borderTop: "1px solid var(--border)", paddingTop: "12px", marginTop: "4px" }}>
-                <label style={{ fontSize: "11px", fontWeight: "800", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>Constraints</label>
+                <label style={{ fontSize: "11px", fontWeight: "800", color: "var(--text-dim)", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>Strict Thesis Constraints</label>
                 {[
-                  { label: "Fragility (LBS-based)", val: fragilityConstraint, set: setFragilityConstraint },
-                  { label: "Allow item rotation", val: rotationConstraint, set: setRotationConstraint },
-                  { label: "LIFO constraint", val: lifoConstraint, set: setLifoConstraint }
-                ].map(({ label, val, set }) => (
+                  { label: "C1: 3D Orthogonal Rotation", val: true },
+                  { label: "C3: Bin Weight Capacity", val: true },
+                  { label: "C4: LBS-based Fragility", val: true },
+                  { label: "C5: 80% Base Support", val: true },
+                  { label: "C6: Multi-drop Extraction Order", val: true }
+                ].map(({ label, val }) => (
                   <div className="switch-container" key={label}>
                     <span className="switch-label">{label}</span>
                     <label className="switch">
-                      <input type="checkbox" checked={val} onChange={(e) => { set(e.target.checked); setIsCustomized(true); }} />
-                      <span className="slider" />
+                      <input type="checkbox" checked={val} readOnly disabled />
+                      <span className="slider" style={{ opacity: 0.6 }} />
                     </label>
                   </div>
                 ))}
@@ -320,7 +323,7 @@ export default function LogisticsTab({
             </button>
             <button style={optionTabStyle("B")} onClick={() => setActiveOption("B")}>
               <span style={{ fontSize: "11px", fontWeight: "800", opacity: 0.75, letterSpacing: "0.07em", textTransform: "uppercase" }}>Option B</span>
-              <span style={{ fontSize: "14px" }}>Use built-in OR-Library dataset</span>
+              <span style={{ fontSize: "14px" }}>Use wtpack Benchmark Dataset</span>
             </button>
           </div>
 
@@ -436,9 +439,9 @@ export default function LogisticsTab({
           {activeOption === "B" && (
             <div style={{ background: "var(--bg-card)", border: "2px solid var(--primary)", borderRadius: "12px", padding: "24px", boxShadow: "var(--shadow)" }}>
               <div style={{ marginBottom: "16px" }}>
-                <h4 style={{ fontSize: "16px", fontWeight: "800", color: "var(--text-main)", marginBottom: "4px" }}>Built-in OR-Library Benchmark</h4>
+                <h4 style={{ fontSize: "16px", fontWeight: "800", color: "var(--text-main)", marginBottom: "4px" }}>wtpack Validation Dataset</h4>
                 <p style={{ fontSize: "12px", color: "var(--text-dim)" }}>
-                  Select a pre-built benchmark instance. The item list below will reflect the loaded dataset — your manually added items are not affected.
+                  Select a wtpack benchmark instance. The item list below will reflect the loaded dataset — your manually added items are not affected.
                 </p>
               </div>
 
@@ -540,7 +543,7 @@ export default function LogisticsTab({
         <div style={{ fontSize: "13px", color: "var(--text-dim)", display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ color: "var(--text-main)", fontWeight: "700" }}>{totalItemsCount}</span> items ready
           <span style={{ opacity: 0.4, margin: "0 4px" }}>·</span>
-          Source: <span style={{ color: "var(--primary)", fontWeight: "700" }}>{activeOption === "A" ? "Manual" : "OR-Library"}</span>
+          Source: <span style={{ color: "var(--primary)", fontWeight: "700" }}>{activeOption === "A" ? "Manual" : "wtpack"}</span>
           <span style={{ opacity: 0.4, margin: "0 4px" }}>·</span>
           Strategy: <span style={{ color: "var(--primary)", fontWeight: "700" }}>{strategy}</span>
           <span style={{ opacity: 0.4, margin: "0 4px" }}>·</span>
@@ -555,26 +558,44 @@ export default function LogisticsTab({
               Clear all
             </button>
           )}
-          {!running ? (
-            <button
-              onClick={handleStartRun}
-              disabled={!canRun}
-              style={{
-                padding: "10px 24px",
-                background: canRun ? "var(--primary)" : "var(--text-dim)",
-                color: "#ffffff", border: "none", borderRadius: "6px",
-                fontSize: "14px", fontWeight: "700",
-                cursor: canRun ? "pointer" : "not-allowed",
-                transition: "all 0.15s ease", whiteSpace: "nowrap"
-              }}
-            >
-              Run optimizer
-            </button>
+          {!running && !isBenchmarking ? (
+            <>
+              <button
+                onClick={handleBenchmarkRun}
+                disabled={!canRun}
+                style={{
+                  padding: "10px 24px",
+                  background: canRun ? "var(--bg-input)" : "var(--text-dim)",
+                  border: canRun ? "1px solid var(--border)" : "none",
+                  color: canRun ? "var(--text-main)" : "#ffffff", 
+                  borderRadius: "6px",
+                  fontSize: "14px", fontWeight: "700",
+                  cursor: canRun ? "pointer" : "not-allowed",
+                  transition: "all 0.15s ease", whiteSpace: "nowrap"
+                }}
+              >
+                Compare All Strategies
+              </button>
+              <button
+                onClick={handleStartRun}
+                disabled={!canRun}
+                style={{
+                  padding: "10px 24px",
+                  background: canRun ? "var(--primary)" : "var(--text-dim)",
+                  color: "#ffffff", border: "none", borderRadius: "6px",
+                  fontSize: "14px", fontWeight: "700",
+                  cursor: canRun ? "pointer" : "not-allowed",
+                  transition: "all 0.15s ease", whiteSpace: "nowrap"
+                }}
+              >
+                Run optimizer
+              </button>
+            </>
           ) : (
             <>
               <button disabled style={{ padding: "10px 24px", background: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--text-muted)", borderRadius: "6px", fontSize: "14px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid var(--primary)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                Running... {elapsed}s
+                {isBenchmarking ? "Benchmarking..." : `Running... ${elapsed}s`}
               </button>
               <button onClick={handleStopRun} style={{ padding: "10px 24px", background: "var(--red-light)", border: "1px solid var(--red)", color: "var(--red)", borderRadius: "6px", fontSize: "14px", fontWeight: "700", cursor: "pointer" }}>
                 ■ Stop

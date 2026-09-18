@@ -110,14 +110,6 @@ def compute_weight_capacity(items, container):
     return math.ceil(total_wt / lb)
 
 
-def assign_weights(items, seed=42):
-    """Deterministic synthetic weights (BR data has none). Controlled variable."""
-    import random
-    rng = random.Random(seed)
-    for item in items:
-        if 'weight' not in item:
-            item['weight'] = rng.randint(1, 20)
-
 
 def robustness(su_values):
     """M-5. Sample std dev of SU across runs. Returns None if <2 runs."""

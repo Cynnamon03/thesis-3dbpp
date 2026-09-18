@@ -68,9 +68,10 @@ export default function RunHistoryTab({
             style={{ padding: "8px 12px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", fontWeight: "600", outline: "none" }}
           >
             <option value="All">All Strategies</option>
-            <option value="Sequential">Sequential Fit</option>
-            <option value="Embedded">Embedded SA-GWO</option>
-            <option value="Repair-based">Repair-based Optimization</option>
+            <option value="DGWO">Standalone DGWO</option>
+            <option value="MOGWO">Standalone MOGWO</option>
+            <option value="SEQ">Sequential Hybrid</option>
+            <option value="REP">Repair-based Hybrid</option>
           </select>
 
           <button
@@ -109,8 +110,8 @@ export default function RunHistoryTab({
                         borderRadius: "4px",
                         fontSize: "11px",
                         fontWeight: "700",
-                        background: run.strategy === "Repair-based" ? "var(--primary-light)" : run.strategy === "Embedded" ? "var(--blue-light)" : "var(--bg-input)",
-                        color: run.strategy === "Repair-based" ? "var(--primary)" : run.strategy === "Embedded" ? "var(--blue)" : "var(--text-muted)"
+                        background: run.strategy === "REP" ? "var(--primary-light)" : run.strategy === "SEQ" ? "var(--blue-light)" : run.strategy === "DGWO" ? "var(--green-light)" : "var(--amber-light)",
+                        color: run.strategy === "REP" ? "var(--primary)" : run.strategy === "SEQ" ? "var(--blue)" : run.strategy === "DGWO" ? "var(--green)" : "var(--amber)"
                       }}>
                         {run.strategy}
                       </span>

@@ -1,43 +1,7 @@
 import math
 import numpy as np
 
-def assign_thesis_attributes(items, seed=42):
-    """
-    Ensures all items have 'weight', 'LBS', 'fragile', and 'stop' attributes.
-    This simulates the dataset augmentation described in the thesis.
-    """
-    rng = np.random.default_rng(seed)
-    
-    # 1. Ensure weight exists
-    for i, item in enumerate(items):
-        if 'weight' not in item:
-            item['weight'] = rng.integers(1, 21)
-            
-        if 'LBS' not in item and 'lbs' not in item and 'LoadBearingStrength' not in item:
-            vol = item['L'] * item['H'] * item['D']
-            item['LBS'] = item['weight'] + rng.integers(10, 50) + (vol / 10000)
-        else:
-            item['LBS'] = float(item.get('LBS', item.get('lbs', item.get('LoadBearingStrength'))))
-            
-    # 2. Fragility Class Assignment (Q1 Threshold)
-    lbs_values = [item['LBS'] for item in items]
-    q1 = np.percentile(lbs_values, 25)
-    
-    for item in items:
-        if item['LBS'] <= q1:
-            item['fragile'] = 1
-        else:
-            item['fragile'] = 0
-            
-    # 3. 3-Stop Uniform Assignment (+- 10% balance)
-    # Assign stops 1, 2, 3 evenly across the items
-    n_items = len(items)
-    stops = [1, 2, 3] * (n_items // 3 + 1)
-    stops = stops[:n_items]
-    rng.shuffle(stops)
-    
-    for i, item in enumerate(items):
-        item['stop'] = stops[i]
+
 
 def _overlap(a0, a1, b0, b1):
     return max(0, min(a1, b1) - max(a0, b0))
@@ -120,7 +84,7 @@ def evaluate_constraints(placements, items):
             
             # C3: Weight Capacity (LBS)
             # The sum of weights of all boxes directly or indirectly above i must be <= LBS_i
-            cumulative_weight = sum(items[j].get('weight', 1) for j in boxes_above)
+            cumulative_weight = sum(items[j].get('Weight', items[j].get('weight', 1)) for j in boxes_above)
             is_c3_ok = cumulative_weight <= items[i].get('LBS', float('inf'))
             
             # C4: Fragility

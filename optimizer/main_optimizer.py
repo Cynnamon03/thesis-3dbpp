@@ -25,7 +25,7 @@ from instance_reader import load_instance
 from hd_gwo import HDGWO
 from thesis_algorithms import StandaloneDGWO, StandaloneMOGWO, SequentialHybrid, RepairBasedHybrid
 from thesis_metrics import evaluate_constraints
-from webapp_metrics import (assign_weights, compute_weight_capacity,
+from webapp_metrics import (compute_weight_capacity,
                             space_utilization, constraint_satisfaction)
 
 
@@ -59,10 +59,7 @@ def main():
     n  = len(items)
     lb = lower_bound(items, container)
 
-    # Thesis metrics need per-item weights and a per-bin weight capacity.
-    # BR data carries no weights, so assign deterministic synthetic weights
-    # (seed fixed -> controlled variable, reproducible across runs).
-    assign_weights(items, seed=42)
+
     weight_cap = compute_weight_capacity(items, container)
 
     print(f"Instance  : {args.instance_path}", file=sys.stderr, flush=True)
@@ -147,9 +144,9 @@ def main():
             "orig_L": items[item_idx]['L'],
             "orig_H": items[item_idx]['H'],
             "orig_D": items[item_idx]['D'],
-            "stop":     items[item_idx].get('stop', 1),
-            "type":     items[item_idx].get('type', 'Standard'),
-            "weight":   items[item_idx].get('weight', 0),
+            "stop":     items[item_idx].get('stop', items[item_idx].get('Stop', 1)),
+            "type":     items[item_idx].get('type', items[item_idx].get('Type', 'Standard')),
+            "weight":   items[item_idx].get('weight', items[item_idx].get('Weight', 0)),
         })
     packed_items.sort(key=lambda p: (p["bin_id"], p["z"], p["y"], p["x"]))
 

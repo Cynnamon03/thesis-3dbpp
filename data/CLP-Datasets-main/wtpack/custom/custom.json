@@ -1,0 +1,13 @@
+{
+  "Name": "custom",
+  "Objects": [
+    {
+      "Length": 600,
+      "Height": 250,
+      "Depth": 250,
+      "Stock": null,
+      "Cost": 0
+    }
+  ],
+  "Items": []
+}
