@@ -39,14 +39,21 @@ def _overlaps(ax, ay, az, al, ah, ad, bx, by, bz, bl, bh, bd):
 
 
 def _fits(ex, ey, ez, l, h, d, placed_in_bin):
-    """True if item (l,h,d) can be placed at (ex,ey,ez) without conflict."""
+    """True if item (l,h,d) can be placed at (ex,ey,ez) without conflict and with support."""
+    supported = (ey == 0)
     for (px, py, pz, pl, ph, pd) in placed_in_bin:
         # Inlined overlaps check to avoid function call overhead
         if (ex < px + pl and ex + l > px and
             ey < py + ph and ey + h > py and
             ez < pz + pd and ez + d > pz):
             return False
-    return True
+        
+        # Support check: if a box is directly below, and footprints overlap
+        if py + ph == ey:
+            if max(ex, px) < min(ex + l, px + pl) and max(ez, pz) < min(ez + d, pz + pd):
+                supported = True
+                
+    return supported
 
 
 def _update_eps(eps, placed_in_bin, nx, ny, nz, nl, nh, nd, CL, CH, CD):

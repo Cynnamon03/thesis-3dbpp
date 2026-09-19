@@ -14,7 +14,7 @@ const WS_PORT = 3002;
 
 const DATA_ROOT = path.join(__dirname, "..", "data", "CLP-Datasets-Main", "wtpack");
 const OPTIMIZER = path.join(__dirname, "..", "optimizer", "main_optimizer.py");
-const BENCHMARK_SCRIPT = path.join(__dirname, "..", "optimizer", "benchmark.py");
+
 
 app.use(cors());
 app.use(express.json());
@@ -86,8 +86,10 @@ wss.on("connection", (ws) => {
       const maxTime = Math.min(Number(msg.maxTime) || 90, 300);
       
       const strategyMap = {
+        "DGWO": "DGWO",
+        "MOGWO": "MOGWO",
         "Sequential": "SEQ",
-        "Repair-based": "REP"
+        "Repair-Based": "REP"
       };
       const pyStrategy = strategyMap[msg.strategy] || "SEQ";
 
@@ -118,53 +120,7 @@ wss.on("connection", (ws) => {
       });
     }
 
-    if (msg.action === "benchmark") {
-      killChild(); // abort any prior run for this connection
 
-      const instancePath = msg.instancePath;
-      if (!instancePath) {
-        send({ type: "error", error: "instancePath required" });
-        return;
-      }
-
-      const norm = path.resolve(instancePath);
-      if (!norm.startsWith(path.resolve(DATA_ROOT))) {
-        send({ type: "error", error: "Path outside data directory" });
-        return;
-      }
-      if (!fs.existsSync(norm)) {
-        send({ type: "error", error: "File not found" });
-        return;
-      }
-
-      const maxTime = Math.min(Number(msg.maxTime) || 90, 300);
-      
-      childProc = spawn(
-        "python",
-        [BENCHMARK_SCRIPT, norm, "--max-time", String(maxTime)],
-        { env: { ...process.env, PYTHONMALLOC: "malloc" } }
-      );
-
-      const rl = readline.createInterface({ input: childProc.stdout, crlfDelay: Infinity });
-      rl.on("line", (line) => {
-        const t = line.trim();
-        if (!t) return;
-        try { send(JSON.parse(t)); } catch {}
-      });
-
-      childProc.stderr.on("data", (chunk) => process.stdout.write(chunk));
-
-      childProc.on("close", (code) => {
-        rl.close();
-        send({ type: "benchmark_closed", code });
-        childProc = null;
-      });
-
-      childProc.on("error", (err) => {
-        send({ type: "error", error: err.message });
-        childProc = null;
-      });
-    }
 
     if (msg.action === "stop") {
       killChild();
@@ -245,7 +201,9 @@ app.get("/api/instance-details", (req, res) => {
       Qty: it.Demand,
       Type: it.Type || "Standard",
       Weight: it.Weight,
-      Stop: it.Stop
+      Stop: it.Stop,
+      LBS: it.LBS,
+      fragile: it.fragile
     }));
 
     res.json({ container, items });

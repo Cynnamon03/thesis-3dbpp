@@ -62,7 +62,11 @@ def evaluate_constraints(placements, items):
             "C4_fragility_pct": 0.0,
             "C5_balance_pct": 0.0,
             "C6_stop_order_pct": 0.0,
-            "total_compliant_pct": 0.0
+            "total_compliant_pct": 0.0,
+            "C3_weight_v": 0,
+            "C4_fragility_v": 0,
+            "C5_balance_v": 0,
+            "C6_stop_order_v": 0
         }
     
     # Group by bin to limit comparisons
@@ -129,7 +133,11 @@ def evaluate_constraints(placements, items):
         "C4_fragility_pct": (c4_ok / total) * 100.0,
         "C5_balance_pct": (c5_ok / total) * 100.0,
         "C6_stop_order_pct": (c6_ok / total) * 100.0,
-        "total_compliant_pct": (all_ok / total) * 100.0
+        "total_compliant_pct": (all_ok / total) * 100.0,
+        "C3_weight_v": total - c3_ok,
+        "C4_fragility_v": total - c4_ok,
+        "C5_balance_v": total - c5_ok,
+        "C6_stop_order_v": total - c6_ok
     }
     
     return detail["total_compliant_pct"], detail

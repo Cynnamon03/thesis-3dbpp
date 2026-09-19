@@ -30,11 +30,12 @@ export default function LogisticsTab({
   elapsed,
   handleStartRun,
   handleStopRun,
-  handleBenchmarkRun,
-  isBenchmarking,
   canRun,
   activeOption,
-  setActiveOption
+  setActiveOption,
+  finalResult,
+  setActiveTab,
+  stats
 }) {
   const fileInputRef = useRef(null);
 
@@ -392,15 +393,15 @@ export default function LogisticsTab({
                       {instanceItems.map((item, idx) => (
                         <tr key={idx}>
                           <td>{item.id}</td>
-                          <td>{item.stop || 1}</td>
-                          <td>{item.length}</td>
-                          <td>{item.depth}</td>
-                          <td>{item.height}</td>
+                          <td>{item.Stop || item.stop || 1}</td>
+                          <td>{item.L || item.length}</td>
+                          <td>{item.D || item.depth}</td>
+                          <td>{item.H || item.height}</td>
                           <td>{item.Weight || item.weight}</td>
-                          <td>{item.LBS}</td>
+                          <td>{item.LBS != null ? item.LBS : (item.Weight || item.weight) * 10}</td>
                           <td>
-                            <span className={`badge ${item.fragile ? "badge-warn" : "badge-neutral"}`}>
-                              {item.fragile ? "Fragile" : "Standard"}
+                            <span className={`badge ${item.Type === "Fragile" || item.fragile ? "badge-warn" : (item.Type === "Heavy" ? "badge-danger" : "badge-neutral")}`}>
+                              {item.Type || (item.fragile ? "Fragile" : "Standard")}
                             </span>
                           </td>
                         </tr>
@@ -451,6 +452,13 @@ export default function LogisticsTab({
                 <div>
                   <div style={{ fontWeight: 700, fontSize: "13px" }}>Fix as it goes <span className="field-hint" style={{ fontWeight: 400 }}>(Repair-Based Hybrid)</span></div>
                   <div className="field-hint">Checks and corrects each item's placement immediately as it's packed</div>
+                </div>
+              </label>
+              <label className="strategy-opt" style={{ marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "18px" }}>
+                <input type="radio" name="strategy" checked={strategy === "ALL"} onChange={() => setStrategy("ALL")} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--primary-dark)" }}>Run all 4 methods <span className="field-hint" style={{ fontWeight: 400 }}>(Sequential Batch)</span></div>
+                  <div className="field-hint">Automatically queues and runs every packing strategy back-to-back</div>
                 </div>
               </label>
             </div>
@@ -524,49 +532,129 @@ export default function LogisticsTab({
         </div>
       </div>
 
-      {/* Persistent summary + nav */}
-      <div className="card" style={{ marginTop: "20px", position: "sticky", bottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "var(--shadow-2)", zIndex: 10 }}>
-        <div style={{ display: "flex", gap: "22px", alignItems: "center" }}>
-          <div>
-            <span className="field-hint">Container</span>
-            <div style={{ fontWeight: 700, fontSize: "13px" }}>{containerSpecs.L}×{containerSpecs.D}×{containerSpecs.H} cm</div>
-          </div>
-          <div style={{ width: "1px", height: "28px", background: "var(--border)" }}></div>
-          <div>
-            <span className="field-hint">Items</span>
-            <div style={{ fontWeight: 700, fontSize: "13px" }}>
-              {activeOption === "A" ? `${totalManualItems} ready · Manual` : `${totalInstanceItems} ready · wtpack`}
+      {/* ============ PROCESSING SCREEN ============ */}
+      <div className={`wiz-panel ${currentStep === 4 ? "active" : ""}`}>
+        <div className="card" style={{ padding: "56px 32px", textAlign: "center" }}>
+          {!running && finalResult ? (
+            <div>
+              <div style={{ width: "64px", height: "64px", background: "var(--safe-tint)", color: "var(--safe)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" width="32" height="32"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <div className="font-display" style={{ fontSize: "22px", fontWeight: 700, marginBottom: "12px", color: "var(--ink)" }}>Run Complete!</div>
+              <div style={{ color: "var(--ink-soft)", fontSize: "14px", maxWidth: "450px", margin: "0 auto 32px auto", lineHeight: 1.6 }}>
+                {strategy === "ALL" 
+                  ? "The optimizer successfully ran all 4 strategies sequentially! Head over to the Compare Runs tab to see how they stacked up."
+                  : `The optimizer successfully packed your items using the ${strategy} strategy. Choose where you'd like to explore the results:`
+                }
+              </div>
+              
+              <div style={{ display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap" }}>
+                {strategy === "ALL" ? (
+                  <>
+                    <button className="btn btn-primary" onClick={() => setActiveTab('compare')} style={{ display: "flex", flexDirection: "column", gap: "6px", height: "auto", padding: "16px 24px", alignItems: "center" }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24"><rect x="3" y="10" width="4" height="11"/><rect x="10" y="5" width="4" height="16"/><rect x="17" y="13" width="4" height="8"/></svg>
+                      <span style={{ fontSize: "14px", fontWeight: 700 }}>Compare Runs</span>
+                      <span style={{ fontSize: "11px", fontWeight: 400, opacity: 0.8 }}>Analyze performance differences</span>
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => setActiveTab('history')} style={{ display: "flex", flexDirection: "column", gap: "6px", height: "auto", padding: "16px 24px", alignItems: "center" }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+                      <span style={{ fontSize: "14px", fontWeight: 700 }}>Run History</span>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--ink-faint)" }}>View all completed runs</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn btn-primary" onClick={() => setActiveTab('visualization')} style={{ display: "flex", flexDirection: "column", gap: "6px", height: "auto", padding: "16px 24px", alignItems: "center" }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12l8.73-5.04"/><path d="M12 22.08V12"/></svg>
+                      <span style={{ fontSize: "14px", fontWeight: 700 }}>Open 3D Viewer</span>
+                      <span style={{ fontSize: "11px", fontWeight: 400, opacity: 0.8 }}>Inspect placement layout</span>
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => setActiveTab('results')} style={{ display: "flex", flexDirection: "column", gap: "6px", height: "auto", padding: "16px 24px", alignItems: "center" }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+                      <span style={{ fontSize: "14px", fontWeight: 700 }}>See Results Report</span>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--ink-faint)" }}>View metrics and export</span>
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => setActiveTab('history')} style={{ display: "flex", flexDirection: "column", gap: "6px", height: "auto", padding: "16px 24px", alignItems: "center" }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+                      <span style={{ fontSize: "14px", fontWeight: 700 }}>Run History</span>
+                      <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--ink-faint)" }}>Compare past runs</span>
+                    </button>
+                  </>
+                )}
+              </div>
+              <div style={{ marginTop: "32px" }}>
+                <button className="btn btn-ghost" onClick={() => { setCurrentStep(1); }}>← Start a new analysis</button>
+              </div>
             </div>
-          </div>
-          <div style={{ width: "1px", height: "28px", background: "var(--border)" }}></div>
-          <div>
-            <span className="field-hint">Method</span>
-            <div style={{ fontWeight: 700, fontSize: "13px" }}>{strategy}</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {running ? (
-            <>
-              <span className="field-hint">Elapsed: {formatTime(elapsed)}</span>
-              <button className="btn btn-danger-ghost" onClick={handleStopRun}>Stop</button>
-            </>
           ) : (
-            <>
-              {currentStep > 1 && <button className="btn btn-secondary" onClick={() => goToStep(currentStep - 1)}>← Back</button>}
-              {currentStep < 3 && <button className="btn btn-secondary" onClick={() => goToStep(currentStep + 1)}>Next step →</button>}
-              {currentStep === 3 && (
-                <>
-                  <button className="btn btn-secondary" onClick={handleBenchmarkRun} disabled={!canRun}>Run Benchmark</button>
-                  <button className="btn btn-primary" onClick={handleStartRun} disabled={!canRun}>
-                    <svg viewBox="0 0 24 24" fill="currentColor" strokeWidth="2"><path d="M8 5v14l11-7z"/></svg>
-                    Run optimizer
-                  </button>
-                </>
+            <div>
+              <div className="processing-spinner" style={{ margin: "0 auto 20px auto" }}></div>
+              <div className="font-display" style={{ fontSize: "18px", fontWeight: 600, marginBottom: "8px" }}>Packing your items…</div>
+              <div style={{ color: "var(--ink-soft)", fontSize: "13px", maxWidth: "400px", margin: "0 auto" }}>Please wait while the algorithm optimizes your load.</div>
+              {stats && (
+                <div style={{ marginTop: "24px", padding: "16px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "inline-block", textAlign: "left", minWidth: "260px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 600 }}>Iteration progress</span>
+                    <span style={{ fontSize: "13px", color: "var(--ink-faint)" }}>{stats.iteration} / {stats.maxIter}</span>
+                  </div>
+                  <div style={{ width: "100%", height: "6px", background: "var(--border)", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(100, (stats.iteration / stats.maxIter) * 100)}%`, height: "100%", background: "var(--primary)", transition: "width 0.2s ease" }}></div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px", fontSize: "12px", color: "var(--ink-soft)" }}>
+                    <span>Elapsed time</span>
+                    <span className="mono">{formatTime(elapsed)}</span>
+                  </div>
+                </div>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Persistent summary + nav */}
+      {currentStep !== 4 && (
+        <div className="card" style={{ marginTop: "20px", position: "sticky", bottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "var(--shadow-2)", zIndex: 10 }}>
+          <div style={{ display: "flex", gap: "22px", alignItems: "center" }}>
+            <div>
+              <span className="field-hint">Container</span>
+              <div style={{ fontWeight: 700, fontSize: "13px" }}>{containerSpecs.L}×{containerSpecs.D}×{containerSpecs.H} cm</div>
+            </div>
+            <div style={{ width: "1px", height: "28px", background: "var(--border)" }}></div>
+            <div>
+              <span className="field-hint">Items</span>
+              <div style={{ fontWeight: 700, fontSize: "13px" }}>
+                {activeOption === "A" ? `${totalManualItems} ready · Manual` : `${totalInstanceItems} ready · wtpack`}
+              </div>
+            </div>
+            <div style={{ width: "1px", height: "28px", background: "var(--border)" }}></div>
+            <div>
+              <span className="field-hint">Method</span>
+              <div style={{ fontWeight: 700, fontSize: "13px" }}>{strategy || "None selected"}</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {running ? (
+              <>
+                <span className="field-hint">Elapsed: {formatTime(elapsed)}</span>
+                <button className="btn btn-danger-ghost" onClick={handleStopRun}>Stop</button>
+              </>
+            ) : (
+              <>
+                {currentStep > 1 && <button className="btn btn-secondary" onClick={() => goToStep(currentStep - 1)}>← Back</button>}
+                {currentStep < 3 && <button className="btn btn-secondary" onClick={() => goToStep(currentStep + 1)}>Next step →</button>}
+                {currentStep === 3 && (
+                  <>
+                    <button className="btn btn-primary" onClick={() => { setCurrentStep(4); handleStartRun(); }} disabled={!canRun}>
+                      <svg viewBox="0 0 24 24" fill="currentColor" strokeWidth="2"><path d="M8 5v14l11-7z"/></svg>
+                      Run optimizer
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

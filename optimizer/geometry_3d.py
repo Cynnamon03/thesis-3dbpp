@@ -70,11 +70,8 @@ def place_bin_dblf(item_indices, items, orient_ids, container, weight_capacity=N
     overflow   = []
     total_wt   = 0.0
 
-    sorted_items = sorted(
-        item_indices,
-        key=lambda i: items[i]['L'] * items[i]['H'] * items[i]['D'],
-        reverse=True
-    )
+    # Removed volume sorting to respect incoming GWO sequence (Option A)
+    sorted_items = item_indices
 
     _t_start = _time.time()
 

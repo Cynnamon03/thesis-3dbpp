@@ -6,6 +6,7 @@ import logoImg from "./logo.png";
 import DashboardTab from "./components/DashboardTab";
 import LogisticsTab from "./components/LogisticsTab";
 import ResultsTab from "./components/ResultsTab";
+import GuideTab from "./components/GuideTab";
 import CompareTab from "./components/CompareTab";
 import VisualizationTab from "./components/VisualizationTab";
 import RunHistoryTab from "./components/RunHistoryTab";
@@ -16,7 +17,7 @@ import { instancesApi, runsApi } from "./services/api";
 export default function Shell() {
   const { user, logout } = useAuth();
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("home");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // Profile dropdown state
@@ -29,14 +30,14 @@ export default function Shell() {
   const [loadingList, setLoadingList] = useState(true);
 
   // Dynamic Custom Configurations
-  const [containerSpecs, setContainerSpecs] = useState({ L: 587, H: 233, D: 220 });
+  const [containerSpecs, setContainerSpecs] = useState({ L: 605.8, H: 259.1, D: 243.8 });
   const [maxLoad, setMaxLoad] = useState(28000);
   const [itemsList, setItemsList] = useState([]);       
   const [instanceItems, setInstanceItems] = useState([]); 
   const [isCustomized, setIsCustomized] = useState(false);
 
   // Algorithm Settings & Constraints
-  const [strategy, setStrategy] = useState("Sequential");
+  const [strategy, setStrategy] = useState("");
   const [maxTime] = useState(90);
   const [wolfSize, setWolfSize] = useState(30);
   const [maxIter, setMaxIter] = useState(500);
@@ -62,15 +63,18 @@ export default function Shell() {
   const [finalResult, setFinalResult] = useState(null);
   const [error, setError] = useState(null);
 
+  // Queue state for "Run all 4 methods"
+  const [runQueue, setRunQueue] = useState([]);
+  const activeRunPathRef = useRef(null);
+
   // Run History
   const [runHistory, setRunHistory] = useState([]);
 
-  // Benchmark State
-  const [isBenchmarking, setIsBenchmarking] = useState(false);
-  const [benchmarkResults, setBenchmarkResults] = useState(null);
+
 
   const wsRef = useRef(null);
   const reconnectRef = useRef(null);
+  const activeRunStrategyRef = useRef(strategy);
 
   // Close profile dropdown when clicking outside
   useEffect(() => {
@@ -169,7 +173,7 @@ export default function Shell() {
         setRunning(false);
         // Persist run details
         runsApi.saveRun({
-          strategy: strategy,
+          strategy: activeRunStrategyRef.current,
           instance: isCustomized ? "custom.json" : msg.instance.split(/[\\/]/).pop(),
           n_items: msg.n_items,
           space_util: msg.metrics?.M1_space_utilization_pct || msg.volume_util_pct,
@@ -177,29 +181,41 @@ export default function Shell() {
           runtime_s: msg.runtime_s,
           bins_used: msg.bins_used,
           placements: msg.items,
-          container: msg.container
-        }).then(() => fetchRunHistory()).catch(() => {});
-        break;
-
-      case "benchmark_start":
-        setIsBenchmarking(true);
-        setBenchmarkResults(null);
-        setActiveTab("visualization");
-        break;
-
-      case "benchmark_complete":
-        setIsBenchmarking(false);
-        setBenchmarkResults(msg.results);
-        break;
-
-      case "benchmark_closed":
-        setIsBenchmarking(false);
-        if (msg.code !== 0) setError(`Benchmark process exited with code ${msg.code}`);
+          container: msg.container,
+          peak_memory_mb: msg.metrics?.M4_peak_memory_mb,
+          constraint_satisfaction_pct: msg.metrics?.M2_constraint_satisfaction_pct
+        }).then(() => {
+          fetchRunHistory();
+          // Check queue
+          setRunQueue((prevQueue) => {
+            if (prevQueue.length > 0) {
+              const nextStrat = prevQueue[0];
+              const remaining = prevQueue.slice(1);
+              
+              // Reset UI for next run
+              setInstanceInfo(null);
+              setPlacements(null);
+              setBinsUsed(0);
+              setChartData([]);
+              setStats(null);
+              setFinalResult(null);
+              setError(null);
+              setElapsed(0);
+              
+              activeRunStrategyRef.current = nextStrat;
+              wsRef.current.send(JSON.stringify({ action: "run", instancePath: activeRunPathRef.current, maxTime, strategy: nextStrat }));
+              
+              return remaining;
+            } else {
+              setRunning(false);
+              return prevQueue;
+            }
+          });
+        }).catch(() => { setRunning(false); });
         break;
 
       case "stopped":
         setRunning(false);
-        setIsBenchmarking(false);
         break;
 
       case "run_closed":
@@ -215,7 +231,7 @@ export default function Shell() {
       default:
         break;
     }
-  }, [strategy, isCustomized, fetchRunHistory]);
+  }, [isCustomized, fetchRunHistory]);
 
   const connect = useCallback(() => {
     const ws = new WebSocket("ws://localhost:3002");
@@ -274,7 +290,6 @@ export default function Shell() {
     setStats(null);
     setFinalResult(null);
     setError(null);
-
     let runPath = selected;
 
     if (isCustomized || !selected) {
@@ -295,34 +310,22 @@ export default function Shell() {
       }
     }
 
-    wsRef.current.send(JSON.stringify({ action: "run", instancePath: runPath, maxTime, strategy }));
-    setActiveTab("visualization");
+    activeRunPathRef.current = runPath;
+
+    if (strategy === "ALL") {
+      const allStrats = ["DGWO", "MOGWO", "Sequential Hybrid", "Repair-Based Hybrid"];
+      const firstStrat = allStrats[0];
+      setRunQueue(allStrats.slice(1));
+      activeRunStrategyRef.current = firstStrat;
+      wsRef.current.send(JSON.stringify({ action: "run", instancePath: runPath, maxTime, strategy: firstStrat }));
+    } else {
+      setRunQueue([]);
+      activeRunStrategyRef.current = strategy;
+      wsRef.current.send(JSON.stringify({ action: "run", instancePath: runPath, maxTime, strategy }));
+    }
   }, [selected, running, wsConnected, maxTime, isCustomized, containerSpecs, itemsList, instanceItems, activeOption, strategy]);
 
-  const handleBenchmarkRun = useCallback(async () => {
-    if (isBenchmarking || !wsConnected) return;
-    setIsBenchmarking(true);
-    setBenchmarkResults(null);
-    setError(null);
 
-    let runPath = selected;
-    if (isCustomized || !selected) {
-      try {
-        const data = await instancesApi.saveCustom({ 
-          container: containerSpecs, 
-          items: activeOption === "A" ? itemsList : instanceItems 
-        });
-        if (data.path) runPath = data.path;
-        else throw new Error(data.error || "Failed to compile custom configuration");
-      } catch (err) {
-        setError(err.message);
-        setIsBenchmarking(false);
-        return;
-      }
-    }
-    wsRef.current.send(JSON.stringify({ action: "benchmark", instancePath: runPath, maxTime }));
-    setActiveTab("visualization");
-  }, [selected, isBenchmarking, wsConnected, maxTime, isCustomized, containerSpecs, itemsList, instanceItems, activeOption]);
 
   const handleStopRun = useCallback(() => {
     wsRef.current?.send(JSON.stringify({ action: "stop" }));
@@ -395,16 +398,17 @@ export default function Shell() {
     };
   }, [finalResult]);
 
-  const canRun = wsConnected && !running && (itemsList.length > 0 || instanceItems.length > 0);
+  const canRun = wsConnected && !running && strategy !== "" && (itemsList.length > 0 || instanceItems.length > 0);
 
   const activeItemsCount = activeOption === "A" ? itemsList.length : instanceItems.length;
 
   const tabTitles = {
-    dashboard: "Dashboard",
-    logistics: "Logistics",
+    home: "Home",
+    logistics: "Start Analysis",
     results: "Results",
+    guide: "Loading Guide",
     compare: "Compare Runs",
-    visualization: "Visualization",
+    visualization: "3D Viewer",
     history: "Run History",
     account: "Account Settings"
   };
@@ -415,7 +419,7 @@ export default function Shell() {
       {/* ============ SIDEBAR ============ */}
       <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`} id="sidebar">
         <div className="sidebar-brand">
-          <img src={logoImg} alt="STACKR Logo" style={{ width: "34px", height: "34px", borderRadius: "9px", objectFit: "contain", flexShrink: 0 }} />
+          <img src={logoImg} alt="STACKR Logo" className="brand-mark" style={{ width: "34px", height: "34px", borderRadius: "9px", objectFit: "contain", flexShrink: 0, padding: 0 }} />
           <div>
             <div className="brand-text">STACKR</div>
             <div className="brand-sub">3D Bin Packing Optimizer</div>
@@ -423,28 +427,32 @@ export default function Shell() {
         </div>
 
         <nav className="sidebar-nav">
-          <div className="nav-section-label">Overview</div>
-          <button className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-            <span>Dashboard</span>
+          <div className="nav-section-label">Get started</div>
+          <button className={`nav-item ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+            <span>Home</span>
           </button>
-
-          <div className="nav-section-label">Workspace</div>
           <button className={`nav-item ${activeTab === 'logistics' ? 'active' : ''}`} onClick={() => setActiveTab('logistics')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
-            <span>Logistics</span>
+            <span>Start Analysis</span>
           </button>
           <button className={`nav-item ${activeTab === 'results' ? 'active' : ''}`} onClick={() => setActiveTab('results')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
             <span>Results</span>
           </button>
+          <button className={`nav-item ${activeTab === 'guide' ? 'active' : ''}`} onClick={() => setActiveTab('guide')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+            <span>Loading Guide</span>
+          </button>
+
+          <div className="nav-section-label">Advanced tools</div>
           <button className={`nav-item ${activeTab === 'compare' ? 'active' : ''}`} onClick={() => setActiveTab('compare')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="10" width="4" height="11"/><rect x="10" y="5" width="4" height="16"/><rect x="17" y="13" width="4" height="8"/></svg>
             <span>Compare Runs</span>
           </button>
           <button className={`nav-item ${activeTab === 'visualization' ? 'active' : ''}`} onClick={() => setActiveTab('visualization')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12l8.73-5.04"/><path d="M12 22.08V12"/></svg>
-            <span>Visualization</span>
+            <span>3D Viewer</span>
           </button>
           <button className={`nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
@@ -459,7 +467,7 @@ export default function Shell() {
         </nav>
 
         <div className="sidebar-foot">
-          <button className="collapse-btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+          <button className="collapse-btn" id="collapseBtn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18"><path d="M15 18l-6-6 6-6"/></svg>
             <span>Collapse</span>
           </button>
@@ -470,20 +478,20 @@ export default function Shell() {
       <div className="main">
         <header className="topbar">
           <div className="topbar-left">
-            <div className="crumb">STACKR / <b>{tabTitles[activeTab]}</b></div>
-            <div className="page-title">{tabTitles[activeTab]}</div>
+            <div className="crumb">STACKR / <b id="crumbLabel">{tabTitles[activeTab]}</b></div>
+            <div className="page-title" id="pageTitle">{tabTitles[activeTab]}</div>
           </div>
           <div className="topbar-right">
             <span className="chip"><span className="chip-dot"></span>Sample load: Medium ({activeItemsCount} items)</span>
-            <button className="icon-btn" title="Toggle dark mode" onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}>
+            <button className="icon-btn" id="themeBtn" title="Toggle dark mode" onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}>
               {theme === "light" ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" id="themeIcon"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
               ) : (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
               )}
             </button>
             <div ref={dropdownRef} style={{ position: "relative" }}>
-              <button className="avatar-btn" onClick={() => setProfileOpen((o) => !o)} title="Account">
+              <button className="avatar-btn" data-tab="account" title="Account" onClick={() => setProfileOpen((o) => !o)}>
                 {initials}
               </button>
               {profileOpen && (
@@ -491,17 +499,17 @@ export default function Shell() {
                   position: "absolute",
                   right: 0,
                   top: "46px",
-                  background: "var(--bg-card)",
+                  background: "var(--surface)",
                   border: "1px solid var(--border)",
                   borderRadius: "12px",
                   width: "220px",
-                  boxShadow: "var(--shadow-lg)",
+                  boxShadow: "var(--shadow-2)",
                   padding: "16px",
                   zIndex: 1000
                 }}>
                   <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: "12px", marginBottom: "12px" }}>
-                    <div style={{ fontWeight: "700", fontSize: "14px", color: "var(--text-main)" }}>{user?.name || "User"}</div>
-                    <div style={{ fontSize: "12px", color: "var(--text-dim)", textTransform: "capitalize" }}>{user?.role || "Researcher"}</div>
+                    <div style={{ fontWeight: "700", fontSize: "14px", color: "var(--ink)" }}>{user?.name || "User"}</div>
+                    <div style={{ fontSize: "12px", color: "var(--ink-faint)", textTransform: "capitalize" }}>{user?.role || "Researcher"}</div>
                   </div>
                   <button
                     onClick={() => {
@@ -512,9 +520,9 @@ export default function Shell() {
                       width: "100%",
                       padding: "8px 12px",
                       background: "transparent",
-                      border: "1px solid var(--red)",
+                      border: "1px solid var(--danger)",
                       borderRadius: "6px",
-                      color: "var(--red)",
+                      color: "var(--danger)",
                       fontWeight: "600",
                       fontSize: "13px",
                       cursor: "pointer",
@@ -536,8 +544,8 @@ export default function Shell() {
           </div>
         )}
 
-        <main className="content">
-          <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
+        <main className="content" id="content">
+          <div style={{ display: activeTab === 'home' ? 'block' : 'none' }}>
             <DashboardTab runHistory={runHistory} setActiveTab={setActiveTab} />
           </div>
 
@@ -571,12 +579,17 @@ export default function Shell() {
               elapsed={elapsed}
               handleStartRun={handleStartRun}
               handleStopRun={handleStopRun}
-              handleBenchmarkRun={handleBenchmarkRun}
-              isBenchmarking={isBenchmarking}
               canRun={canRun}
               activeOption={activeOption}
               setActiveOption={setActiveOption}
+              finalResult={finalResult}
+              setActiveTab={setActiveTab}
+              stats={stats}
             />
+          </div>
+
+          <div style={{ display: activeTab === 'guide' ? 'block' : 'none' }}>
+            <GuideTab finalResult={finalResult} />
           </div>
 
           <div style={{ display: activeTab === 'results' ? 'block' : 'none' }}>
@@ -594,7 +607,7 @@ export default function Shell() {
           </div>
 
           <div style={{ display: activeTab === 'compare' ? 'block' : 'none' }}>
-            <CompareTab runHistory={runHistory} />
+            <CompareTab runHistory={runHistory} onLoadVisualization={handleLoadVisualization} />
           </div>
 
           <div style={{ display: activeTab === 'visualization' ? 'block' : 'none' }}>
@@ -604,8 +617,6 @@ export default function Shell() {
               instanceInfo={instanceInfo}
               binsUsed={binsUsed}
               running={running}
-              isBenchmarking={isBenchmarking}
-              benchmarkResults={benchmarkResults}
             />
           </div>
 

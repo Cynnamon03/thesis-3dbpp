@@ -6,15 +6,14 @@ export default function VisualizationTab({
   itemsList,
   instanceInfo,
   binsUsed,
-  running,
-  isBenchmarking,
-  benchmarkResults
+  running
 }) {
   // Visualization Control states (encapsulated locally)
   const [viewportOrientation, setViewportOrientation] = useState("3D");
   const [viewportTrigger, setViewportTrigger] = useState(0);
   const [filterStandard, setFilterStandard] = useState(true);
   const [filterFragile, setFilterFragile] = useState(true);
+  const [filterHeavy, setFilterHeavy] = useState(true);
 
   const [showLabels, setShowLabels] = useState(false);
   const [selectedStop, setSelectedStop] = useState("All");
@@ -45,9 +44,10 @@ export default function VisualizationTab({
       const type = origItem ? origItem.Type : (p.type || "Standard");
       if (type === "Standard") return filterStandard;
       if (type === "Fragile") return filterFragile;
+      if (type === "Heavy") return filterHeavy;
       return true;
     });
-  }, [placements, itemsList, filterStandard, filterFragile, selectedStop]);
+  }, [placements, itemsList, filterStandard, filterFragile, filterHeavy, selectedStop]);
 
   return (
     <div className="grid" style={{ gridTemplateColumns: "260px 1fr", alignItems: "start" }}>
@@ -59,15 +59,20 @@ export default function VisualizationTab({
           <button className={`btn btn-sm ${viewportOrientation === 'Top' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => triggerViewReset("Top")}>Top</button>
           <button className={`btn btn-sm ${viewportOrientation === '3D' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => triggerViewReset("3D")}>3D</button>
         </div>
+        
         <div className="divider"></div>
         <div className="section-tag">Filter by type</div>
         <div className="constraint-row">
           <span style={{ fontSize: "12.5px", fontWeight: 600 }}>Standard</span>
           <label className="switch"><input type="checkbox" checked={filterStandard} onChange={(e) => setFilterStandard(e.target.checked)} /><span className="slider"></span></label>
         </div>
-        <div className="constraint-row" style={{ borderBottom: "none" }}>
+        <div className="constraint-row">
           <span style={{ fontSize: "12.5px", fontWeight: 600 }}>Fragile</span>
           <label className="switch"><input type="checkbox" checked={filterFragile} onChange={(e) => setFilterFragile(e.target.checked)} /><span className="slider"></span></label>
+        </div>
+        <div className="constraint-row" style={{ borderBottom: "none" }}>
+          <span style={{ fontSize: "12.5px", fontWeight: 600 }}>Heavy</span>
+          <label className="switch"><input type="checkbox" checked={filterHeavy} onChange={(e) => setFilterHeavy(e.target.checked)} /><span className="slider"></span></label>
         </div>
         
         <div className="divider"></div>
@@ -106,7 +111,7 @@ export default function VisualizationTab({
             </tr>
             <tr>
               <td style={{ padding: "6px 0", border: "none" }}>Weight</td>
-              <td style={{ padding: "6px 0", border: "none", textAlign: "right" }}>{selectedItemInfo ? `${selectedItemInfo.weight} kg` : "—"}</td>
+              <td style={{ padding: "6px 0", border: "none", textAlign: "right" }}>{selectedItemInfo ? `${selectedItemInfo.weight || 0} kg` : "—"}</td>
             </tr>
           </tbody>
         </table>
@@ -124,47 +129,7 @@ export default function VisualizationTab({
           </div>
         </div>
         <div style={{ minHeight: "450px", borderRadius: "var(--radius-md)", background: "var(--surface-sunken)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
-          {isBenchmarking ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ display: "inline-block", width: 40, height: 40, border: "4px solid var(--primary)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "16px" }} />
-              <h4 style={{ color: "var(--text-main)", fontSize: "16px", fontWeight: "700" }}>Running Benchmark...</h4>
-              <p style={{ color: "var(--text-dim)", fontSize: "13px", marginTop: "4px" }}>Please wait while all 4 strategies are being evaluated in parallel.</p>
-            </div>
-          ) : benchmarkResults ? (
-            <div style={{ width: "100%", padding: "24px" }}>
-              <h4 style={{ color: "var(--primary)", fontSize: "16px", fontWeight: "700", marginBottom: "20px" }}>Benchmark Results</h4>
-              <table className="custom-table" style={{ width: "100%", textAlign: "left" }}>
-                <thead>
-                  <tr>
-                    <th>Strategy</th>
-                    <th>Bins Used</th>
-                    <th>Space Utilization (%)</th>
-                    <th>Constraint Satisfaction (%)</th>
-                    <th>Runtime (s)</th>
-                    <th>Peak Memory (MB)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {benchmarkResults.map((res, idx) => (
-                    <tr key={idx}>
-                      <td style={{ fontWeight: "700", color: "var(--text-main)" }}>{res.strategy}</td>
-                      {res.error ? (
-                        <td colSpan="5" style={{ color: "var(--danger)" }}>Error: {res.error}</td>
-                      ) : (
-                        <>
-                          <td style={{ fontWeight: "700", color: "var(--primary)" }}>{res.bins_used}</td>
-                          <td>{res.su_pct}%</td>
-                          <td>{res.csr_pct}%</td>
-                          <td>{res.runtime_s}s</td>
-                          <td>{res.peak_mem_mb}</td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : filteredPlacements && instanceInfo ? (
+          {filteredPlacements && instanceInfo ? (
             <BinViewer
               placements={filteredPlacements}
               container={instanceInfo.container}

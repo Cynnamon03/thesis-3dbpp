@@ -95,12 +95,13 @@ router.post("/runs", authRequired, (req, res) => {
   const r = req.body || {};
   const info = db
     .prepare(`INSERT INTO runs
-      (user_id, strategy, instance, n_items, space_util, dissipation, runtime_s, bins_used, placements_json, container_json)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`)
+      (user_id, strategy, instance, n_items, space_util, dissipation, runtime_s, bins_used, placements_json, container_json, peak_memory_mb, constraint_satisfaction_pct)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(req.user.id, r.strategy, r.instance, r.n_items, r.space_util,
          r.dissipation, r.runtime_s, r.bins_used,
          r.placements ? JSON.stringify(r.placements) : null,
-         r.container ? JSON.stringify(r.container) : null);
+         r.container ? JSON.stringify(r.container) : null,
+         r.peak_memory_mb, r.constraint_satisfaction_pct);
   res.json({ id: info.lastInsertRowid });
 });
 

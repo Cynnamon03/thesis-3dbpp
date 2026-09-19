@@ -8,10 +8,11 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
-// ── Per-item colour using golden-angle hue ───────────────────────────────────
-function itemHSL(itemIdx) {
-  const hue = (itemIdx * 137.508) % 360;
-  return `hsl(${hue.toFixed(1)}, 70%, 60%)`;
+// ── Per-item colour using type and index ───────────────────────────────────
+function itemColor(type, itemIdx) {
+  if (type === 'Fragile') return `hsl(${(30 + (itemIdx % 5) * 5) % 50}, 80%, 55%)`; // amber tones
+  if (type === 'Heavy')   return `hsl(${(0 + (itemIdx % 5) * 5) % 20}, 75%, 55%)`;   // red tones
+  return `hsl(${(210 + (itemIdx % 10) * 5) % 260}, 70%, 60%)`;                       // standard blue tones
 }
 
 // ── Container wireframe & visual shell ───────────────────────────────────────
@@ -77,9 +78,9 @@ const WireBox = React.memo(function WireBox({ x, y, z, l, h, d }) {
 });
 
 // ── Packed item: solid face + dark edge outline ───────────────────────────────
-const ItemBox = React.memo(function ItemBox({ x, y, z, l, h, d, itemIdx, id, showLabels, onHover, onLeave }) {
+const ItemBox = React.memo(function ItemBox({ x, y, z, l, h, d, itemIdx, id, type, showLabels, onHover, onLeave }) {
   const [hovered, setHovered] = useState(false);
-  const color   = useMemo(() => itemHSL(itemIdx), [itemIdx]);
+  const color   = useMemo(() => itemColor(type, itemIdx), [type, itemIdx]);
   
   const nx = Number(x || 0);
   const ny = Number(y || 0);
@@ -220,7 +221,12 @@ export default function BinViewer({ result, placements: placementsProp, containe
       item_idx: Number(it.item_idx ?? 0),
       stop: it.stop !== undefined ? Number(it.stop) : undefined,
       weight: it.weight !== undefined ? Number(it.weight) : undefined
-    }));
+    })).sort((a, b) => {
+      if (a.bin_id !== b.bin_id) return a.bin_id - b.bin_id;
+      if (a.y !== b.y) return a.y - b.y;
+      if (a.z !== b.z) return a.z - b.z;
+      return a.x - b.x;
+    });
   }, [result, placementsProp]);
 
   const binsUsed = useMemo(() => {
@@ -332,6 +338,7 @@ export default function BinViewer({ result, placements: placementsProp, containe
                     l={it.l} h={it.h} d={it.d}
                     itemIdx={it.item_idx}
                     id={it.id}
+                    type={it.type}
                     showLabels={showLabels}
                     onHover={() => onHoverItem && onHoverItem({
                       id: it.id,

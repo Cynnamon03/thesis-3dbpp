@@ -119,7 +119,7 @@ def main():
             container=container,
             pop_size=30,
             max_iter=500,
-            lambda_penalty=0.10,
+            lambda_w=0.10, lambda_f=0.10, lambda_b=0.10, lambda_a=0.10,
             stream_cb=emit if streaming else None,
         )
 

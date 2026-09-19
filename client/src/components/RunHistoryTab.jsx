@@ -4,9 +4,20 @@ export default function RunHistoryTab({ runHistory, handleExportHistory, onLoadV
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMethod, setFilterMethod] = useState("All methods");
 
+  const methodMapping = {
+    "All methods": "All methods",
+    "Placement only": "DGWO",
+    "Rules only": "MOGWO",
+    "Placement, then rules": "Sequential",
+    "Fix as it goes": "Repair-Based"
+  };
+
   const filteredHistory = runHistory.filter((run) => {
     if (searchTerm && !run.instance.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    if (filterMethod !== "All methods" && run.strategy !== filterMethod) return false;
+    if (filterMethod !== "All methods") {
+      const internalMethod = methodMapping[filterMethod];
+      if (internalMethod && !run.strategy.includes(internalMethod)) return false;
+    }
     return true;
   });
 
@@ -27,15 +38,15 @@ export default function RunHistoryTab({ runHistory, handleExportHistory, onLoadV
           />
           <select style={{ width: "170px" }} value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
             <option>All methods</option>
-            <option>DGWO</option>
-            <option>MOGWO</option>
-            <option>Sequential</option>
-            <option>Repair-Based</option>
+            <option>Placement only</option>
+            <option>Rules only</option>
+            <option>Placement, then rules</option>
+            <option>Fix as it goes</option>
           </select>
           <button className="btn btn-secondary btn-sm" onClick={handleExportHistory}>Export all</button>
         </div>
       </div>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
+      <table>
         <thead>
           <tr>
             <th>ID</th>
@@ -62,15 +73,15 @@ export default function RunHistoryTab({ runHistory, handleExportHistory, onLoadV
                 <td className="mono">#{String(idx + 1).padStart(3, "0")}</td>
                 <td>{run.instance} ({run.n_items} items)</td>
                 <td>
-                  <span className={`badge ${run.strategy === "Repair-Based" || run.strategy === "Sequential" ? "badge-primary" : "badge-neutral"}`}>
+                  <span className={`badge ${run.strategy.includes("Repair") || run.strategy.includes("Sequential") ? "badge-primary" : "badge-neutral"}`}>
                     {run.strategy}
                   </span>
                 </td>
                 <td>{run.bins_used}</td>
                 <td className="mono">{run.space_util?.toFixed(2)}%</td>
                 <td className="mono">{run.runtime_s?.toFixed(2)}s</td>
-                <td className="mono">—</td>
-                <td>{new Date(run.timestamp).toLocaleString()}</td>
+                <td className="mono">{run.peak_memory_mb ? `${run.peak_memory_mb.toFixed(1)} MB` : '—'}</td>
+                <td>{new Date(run.created_at || run.timestamp).toLocaleString()}</td>
                 <td>
                   <button className="btn btn-ghost btn-sm" onClick={() => onLoadVisualization(run)}>View</button>
                 </td>
@@ -79,7 +90,6 @@ export default function RunHistoryTab({ runHistory, handleExportHistory, onLoadV
           )}
         </tbody>
       </table>
-      <div className="field-hint" style={{ marginTop: "14px" }}>The Memory used column will fill in once memory tracking is fully propagated in DB.</div>
     </div>
   );
 }
