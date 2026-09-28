@@ -272,13 +272,13 @@ export default function VisualizationTab({
           <div style={{ color: "var(--text-dim)", marginBottom: 4 }}>Rules broken</div>
           {!hasChecks ? <div style={{ color: "var(--text-dim)" }}>Not available for this run (saved before the problem view).</div>
             : it.violations.length === 0 ? <div style={{ fontWeight: 700, color: "var(--green)" }}>None — follows C3, C4, C5 and C6</div>
-            : it.violations.map((r) => (
-              <div key={r} style={{ fontWeight: 700, color: RULE_COLOR[r] }}>
-                {r} · {RULE_NAME[r]}
-                {r === "C3" && ` (${fmtNum(it.load_above_kg, 1)} kg on a ${fmtNum(it.max_load_kg, 1)} kg limit)`}
-                {r === "C6" && it.c6_blocked_by && it.c6_blocked_by.length > 0 && ` — by ${it.c6_blocked_by.join(", ")}`}
-              </div>
-            ))}
+              : it.violations.map((r) => (
+                <div key={r} style={{ fontWeight: 700, color: RULE_COLOR[r] }}>
+                  {r} · {RULE_NAME[r]}
+                  {r === "C3" && ` (${fmtNum(it.load_above_kg, 1)} kg on a ${fmtNum(it.max_load_kg, 1)} kg limit)`}
+                  {r === "C6" && it.c6_blocked_by && it.c6_blocked_by.length > 0 && ` — by ${it.c6_blocked_by.join(", ")}`}
+                </div>
+              ))}
         </div>
       </div>
     );
@@ -302,7 +302,7 @@ export default function VisualizationTab({
 
       {/* Upper Section: Inspection & 3D Viewer */}
       <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
-        
+
         {/* Left Column: Box Details (Pinned/Sticky) */}
         <div style={{ flex: "0 0 340px", minWidth: 320, position: "sticky", top: "24px" }}>
           <div className="card" style={{ minHeight: "180px", display: "flex", flexDirection: "column" }}>
@@ -392,7 +392,7 @@ export default function VisualizationTab({
         border: "1px solid var(--border)",
         boxShadow: "var(--shadow)"
       }}>
-        
+
         {/* Column 1: Visibility Filters */}
         <div>
           <h4 className="section-tag" style={{ borderBottom: "1px solid var(--border)", paddingBottom: "8px", marginBottom: "16px" }}>● VISIBILITY FILTERS</h4>
@@ -419,7 +419,7 @@ export default function VisualizationTab({
               <span className="switch-label" style={{ fontWeight: 600 }} title="Rear-door frame, cab-end wall and the door-to-cab arrow">Show orientation guides</span>
               <label className="switch"><input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} /><span className="slider" /></label>
             </div>
-            
+
             <div>
               <label style={CAPTION}>Stop</label>
               <select className="form-input" style={{ width: "100%" }} value={selectedStop} onChange={(e) => setSelectedStop(e.target.value)}>
@@ -427,7 +427,7 @@ export default function VisualizationTab({
                 {uniqueStops.map((stop) => <option key={stop} value={stop}>Stop {stop}</option>)}
               </select>
             </div>
-            
+
             <div>
               <label style={CAPTION}>Color mode</label>
               <select className="form-input" style={{ width: "100%" }} value={colorMode} onChange={(e) => setColorMode(e.target.value)}>
@@ -465,7 +465,7 @@ export default function VisualizationTab({
               <Row k="Packed boxes" v={nPlaced} />
               <Row k="Unpacked boxes" v={nNotLoaded !== null ? nNotLoaded : "—"} color={nNotLoaded > 0 ? "var(--amber)" : undefined} />
               <Row k="Total weight loaded" v={`${fmtNum(totalWeight, 1)} kg`} />
-              
+
               {container && (
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: "12px", marginTop: "4px", fontSize: 12, color: "var(--text-dim)" }}>
                   Container: {container.length_cm ?? container.L} × {container.width_cm ?? container.D} × {container.height_cm ?? container.H} cm
@@ -485,12 +485,12 @@ export default function VisualizationTab({
                         if (n === 0) return null;
                         const on = ruleFilter === r;
                         return (
-                          <button key={r} type="button" 
+                          <button key={r} type="button"
                             onClick={() => { setHighlight(true); setRuleFilter(on ? null : r); }}
-                            style={{ 
+                            style={{
                               padding: "4px 8px", borderRadius: 4, cursor: "pointer",
-                              border: `1px solid ${on ? RULE_COLOR[r] : "var(--border)"}`, 
-                              background: on ? "var(--bg-input)" : "transparent", 
+                              border: `1px solid ${on ? RULE_COLOR[r] : "var(--border)"}`,
+                              background: on ? "var(--bg-input)" : "transparent",
                               color: "var(--text-main)", fontSize: 11, fontWeight: on ? 700 : 500
                             }}>
                             {r} ({n})
