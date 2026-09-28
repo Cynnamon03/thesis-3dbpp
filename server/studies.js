@@ -261,8 +261,9 @@ router.post("/", authRequired, (req, res) => {
   const fd = fs.openSync(log, "a");
   let child;
   try {
-    child = spawn("python", argv, { cwd: ROOT, detached: true, stdio: ["ignore", fd, fd], windowsHide: true,
+    child = spawn("python", argv, { cwd: ROOT, detached: true, stdio: ["pipe", fd, fd], windowsHide: true,
                                     env: { ...process.env, PYTHONMALLOC: "malloc" } });
+    child.stdin.end();
     child.unref();
   } catch (err) {
     fs.closeSync(fd);
