@@ -90,7 +90,7 @@ export default function LogisticsTab({
   const PRESET_INFO = {
     quick:    { label: "Quick demo", pop: 10, iter: 60 },
     standard: { label: "Standard",   pop: 10, iter: 300 },
-    full:     { label: "Full",       pop: 30, iter: 500 },
+    thesis:   { label: "Thesis",     pop: 30, iter: 300 },
   };
 
   // Step 1 is done when the load on screen is ready.
