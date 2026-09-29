@@ -99,6 +99,19 @@ def _f(x, sig=6):
     return float(f"{v:.{sig}g}")
 
 
+def magnitude(kind, val):
+    v = abs(val)
+    if kind == "r":
+        if v < 0.1: return "negligible"
+        if v < 0.3: return "small"
+        if v < 0.5: return "medium"
+        return "large"
+    if v < 0.2: return "negligible"
+    if v < 0.5: return "small"
+    if v < 0.8: return "medium"
+    return "large"
+
+
 def holm(pvalues):
     """Holm-Bonferroni step-down. None entries (untestable) are excluded from the family."""
     idx = [i for i, p in enumerate(pvalues) if p is not None]

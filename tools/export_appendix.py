@@ -15,6 +15,20 @@ def main():
     study = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
     runs = study.get('runs', [])
     
+    # Also load greedy and random
+    for base_file in ['experiments/results/greedy_baseline.json', 'experiments/results/random_baseline.json']:
+        p = Path(base_file)
+        if p.exists():
+            data = json.loads(p.read_text(encoding='utf-8'))
+            for inst in data.get('instances', []):
+                for res in inst.get('results', []):
+                    # add instance_id and n_items to res to match study format
+                    res['instance_id'] = inst.get('instance')
+                    res['n_items'] = inst.get('n_items')
+                    if 'configuration' not in res and 'strategy' in res:
+                        res['configuration'] = res['strategy']
+                    runs.append(res)
+    
     out_file = sys.argv[2]
     with open(out_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
