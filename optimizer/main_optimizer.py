@@ -82,6 +82,10 @@ def main():
                     help="Reject placements above a fragile box at decode time (default on)")
     parser.add_argument("--seed", type=int, default=None,
                     help="RNG seed for the thesis strategies (omit = entropy-seeded)")
+    parser.add_argument("--smart-repair", action=argparse.BooleanOptionalAction, default=True,
+                    help="Enable smart repair (rotate/swap) for REP strategy (default on)")
+    parser.add_argument("--seq-split", type=float, default=0.5,
+                    help="Fraction of iterations for Phase 1 in SEQ strategy (default 0.5)")
     parser.add_argument("--strategy", choices=["HDGWO", "DGWO", "MOGWO", "SEQ", "REP"],
                     default="HDGWO", help="Optimization strategy to run")
     args = parser.parse_args()
@@ -157,11 +161,14 @@ def main():
             "lambda_a":          lam(args.lambda_a),
             "enforce_support":   bool(args.enforce_support),
             "enforce_fragility": bool(args.enforce_fragility),
+            "smart_repair":      bool(args.smart_repair),
+            "seq_split":         float(args.seq_split),
             "seed":              args.seed,
         }
         print(f"Params    : pop={params['pop_size']} iter={params['max_iter']} "
               f"lambda=(w={params['lambda_w']}, f={params['lambda_f']}, b={params['lambda_b']}, a={params['lambda_a']}) "
               f"enforce_support={params['enforce_support']} enforce_fragility={params['enforce_fragility']} "
+              f"smart_repair={params['smart_repair']} seq_split={params['seq_split']} "
               f"seed={params['seed']}", file=sys.stderr, flush=True)
     else:
         pop_size    = min(20, max(5,  n // 8))
@@ -240,18 +247,24 @@ def main():
         }[args.strategy]
         # Every CLI flag binds to a constructor argument. `params` is the single
         # source of truth for what runs and is echoed in the result JSON.
-        optimizer = opt_class(
-            items=items,
-            container=container,
-            pop_size=params["pop_size"],
-            max_iter=params["max_iter"],
-            lambda_w=params["lambda_w"], lambda_f=params["lambda_f"],
-            lambda_b=params["lambda_b"], lambda_a=params["lambda_a"],
-            enforce_support=params["enforce_support"],
-            enforce_fragility=params["enforce_fragility"],
-            seed=params["seed"],
-            stream_cb=emit if streaming else None,
-        )
+        kwargs = {
+            "items": items,
+            "container": container,
+            "pop_size": params["pop_size"],
+            "max_iter": params["max_iter"],
+            "lambda_w": params["lambda_w"], "lambda_f": params["lambda_f"],
+            "lambda_b": params["lambda_b"], "lambda_a": params["lambda_a"],
+            "enforce_support": params["enforce_support"],
+            "enforce_fragility": params["enforce_fragility"],
+            "seed": params["seed"],
+            "stream_cb": emit if streaming else None,
+        }
+        if args.strategy == "REP":
+            kwargs["use_smart_repair"] = params["smart_repair"]
+        elif args.strategy == "SEQ":
+            kwargs["seq_split"] = params["seq_split"]
+            
+        optimizer = opt_class(**kwargs)
 
     best = optimizer.run()
     exec_time_ms = (time.perf_counter() - _start_time) * 1000.0   # M-3

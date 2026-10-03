@@ -31,7 +31,7 @@ R2_CHECK = ('C1', 'C2', 'C3', 'C4', 'C5', 'C6')
 OPERATORS = ('R1', 'R2')
 
 STAT_KEYS = ('relocated_R1', 'relocated_R2', 'deferred_R1', 'deferred_R2',
-             'removed_R3', 'passes_used', 'rmax_hit')
+             'removed_R3', 'passes_used', 'rmax_hit', 'smart_swaps', 'smart_rotates', 'smart_evals')
 
 
 # -- Per-pass caches -----------------------------------------------------------
@@ -441,9 +441,76 @@ def find_feasible_position(box_idx, items, placements, orientations, container,
     return None
 
 
+def _try_rotate_in_place(ctx, j, check, stats):
+    pos_j = ctx.placements[j]
+    r_j = ctx.orientations[j]
+    box = ctx.items[j]
+    x, y, z, dx, dy, dz = pos_j
+    for r in box['allowed_orientations']:
+        if r == r_j:
+            continue
+        ndx, ndy, ndz = get_dims(box, r)
+        ndx, ndy, ndz = float(ndx), float(ndy), float(ndz)
+        if ndx <= dx and ndy <= dy and ndz <= dz:
+            new_pos = (x, y, z, ndx, ndy, ndz)
+            stats['smart_evals'] += 1
+            ctx.remove(j)
+            feasible = _feasible_at(j, r, new_pos, ctx.items, ctx.placements, ctx.orientations, ctx.container, check=check)
+            if feasible:
+                ctx.place(j, new_pos, r)
+                stats['smart_rotates'] += 1
+                return True
+            else:
+                ctx.place(j, pos_j, r_j)
+    return False
+
+def _try_swap(ctx, j, check, stats):
+    pos_j = ctx.placements[j]
+    r_j = ctx.orientations[j]
+    
+    candidates = []
+    for k in list(ctx.placements):
+        if k == j: continue
+        pos_k = ctx.placements[k]
+        if pos_j[3:] == pos_k[3:]:
+            candidates.append(k)
+            
+    for k in candidates:
+        pos_k = ctx.placements[k]
+        r_k = ctx.orientations[k]
+        
+        stats['smart_evals'] += 1
+        ctx.remove(j)
+        ctx.remove(k)
+        
+        new_pos_j = (pos_k[0], pos_k[1], pos_k[2], pos_j[3], pos_j[4], pos_j[5])
+        new_pos_k = (pos_j[0], pos_j[1], pos_j[2], pos_k[3], pos_k[4], pos_k[5])
+        
+        if _feasible_at(j, r_j, new_pos_j, ctx.items, ctx.placements, ctx.orientations, ctx.container, check=check):
+            ctx.place(j, new_pos_j, r_j)
+            stats['smart_evals'] += 1
+            if _feasible_at(k, r_k, new_pos_k, ctx.items, ctx.placements, ctx.orientations, ctx.container, check=check):
+                ctx.place(k, new_pos_k, r_k)
+                stats['smart_swaps'] += 1
+                return True
+            else:
+                ctx.remove(j)
+                
+        ctx.place(j, pos_j, r_j)
+        ctx.place(k, pos_k, r_k)
+
+    return False
+
 # -- Relocate-or-defer primitive -----------------------------------------------
-def _relocate_or_defer(ctx, j, unpacked, stats, tag, **kw):
+def _relocate_or_defer(ctx, j, unpacked, stats, tag, use_smart_repair=False, **kw):
     """Remove j, try to re-place it; on failure push it to the unpacked list."""
+    if use_smart_repair:
+        check = kw.get('check', ('C1', 'C2', 'C3', 'C4', 'C5', 'C6'))
+        if _try_rotate_in_place(ctx, j, check, stats):
+            return
+        if _try_swap(ctx, j, check, stats):
+            return
+
     ctx.remove(j)
     found = find_feasible_position(j, ctx.items, ctx.placements, ctx.orientations,
                                    ctx.container, reject=ctx.rejections[tag],
@@ -458,7 +525,7 @@ def _relocate_or_defer(ctx, j, unpacked, stats, tag, **kw):
 
 
 # -- R1: weight ----------------------------------------------------------------
-def repair_R1(ctx, unpacked, stats):
+def repair_R1(ctx, unpacked, stats, use_smart_repair=False):
     changed = False
     for i in list(ctx.placements):
         if i not in ctx.placements:
@@ -471,13 +538,13 @@ def repair_R1(ctx, unpacked, stats):
                 break
             if j in ctx.placements:
                 borne -= ctx.items[j]['mass']
-                _relocate_or_defer(ctx, j, unpacked, stats, 'R1')
+                _relocate_or_defer(ctx, j, unpacked, stats, 'R1', use_smart_repair=use_smart_repair)
                 changed = True
     return changed
 
 
 # -- R2: stop order ------------------------------------------------------------
-def repair_R2(ctx, unpacked, stats):
+def repair_R2(ctx, unpacked, stats, use_smart_repair=False):
     changed = False
     for i in list(ctx.placements):
         if i not in ctx.placements:
@@ -490,7 +557,7 @@ def repair_R2(ctx, unpacked, stats):
 
         for j in blockers:
             if j in ctx.placements:
-                _relocate_or_defer(ctx, j, unpacked, stats, 'R2',
+                _relocate_or_defer(ctx, j, unpacked, stats, 'R2', use_smart_repair=use_smart_repair,
                                    check=R2_CHECK, corridor=corridor)
                 changed = True
     return changed
@@ -531,7 +598,7 @@ def repair_R3(ctx, unpacked, stats):
 
 
 # -- Driver --------------------------------------------------------------------
-def repair_arrangement(placements, orientations, unpacked, items, container):
+def repair_arrangement(placements, orientations, unpacked, items, container, use_smart_repair=False):
     """Mutates placements / orientations / unpacked in place. Returns stats."""
     stats = {k: 0 for k in STAT_KEYS}
     ctx = RepairContext(items, placements, orientations, container)
@@ -540,8 +607,8 @@ def repair_arrangement(placements, orientations, unpacked, items, container):
     for _ in range(R_MAX):
         passes += 1
         changed = False
-        changed |= repair_R1(ctx, unpacked, stats)
-        changed |= repair_R2(ctx, unpacked, stats)
+        changed |= repair_R1(ctx, unpacked, stats, use_smart_repair)
+        changed |= repair_R2(ctx, unpacked, stats, use_smart_repair)
         if not changed and not _violators(items, placements, orientations):
             break
     else:

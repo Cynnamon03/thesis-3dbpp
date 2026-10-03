@@ -30,7 +30,8 @@ class WolfContinuous:
         self.scalar_fitness = float('inf')
 
     def decode_and_evaluate(self, items, container, apply_repair=False,
-                            enforce_support=False, enforce_fragility=False):
+                            enforce_support=False, enforce_fragility=False,
+                            compute_penalty=False, use_smart_repair=False):
         """
         Decodes X into discrete placements using DBLF and evaluates fitness.
         If apply_repair is True, applies heuristic repair logic before evaluation.
@@ -38,9 +39,6 @@ class WolfContinuous:
         that would violate C5 / C4 (the two constraints that stay satisfied as
         more boxes are added).
         """
-    def decode_and_evaluate(self, items, container, apply_repair=False,
-                            enforce_support=False, enforce_fragility=False,
-                            compute_penalty=False):
         # 1. Decode the genome into a placement sequence and orientations
         sequence, orients_map = decode_position(self.X, items, container)
 
@@ -52,7 +50,7 @@ class WolfContinuous:
 
         # 3. (Optional) Repair R1-R5
         if apply_repair:
-            self._repair(items, container)
+            self._repair(items, container, use_smart_repair)
 
         # 4. Evaluate U(X) and S(X)
         self.su = space_utilization(self.placements, container)
@@ -68,12 +66,13 @@ class WolfContinuous:
         else:
             self.scalar_fitness = None
 
-    def _repair(self, items, container):
+    def _repair(self, items, container, use_smart_repair=False):
         """Relocate-then-defer repair R1-R5 (see repair.py). Mutates the
         arrangement in place and records per-call stats on self.last_repair."""
         from repair import repair_arrangement
         self.last_repair = repair_arrangement(
-            self.placements, self.orientations, self.unplaced, items, container)
+            self.placements, self.orientations, self.unplaced, items, container,
+            use_smart_repair=use_smart_repair)
 
     def dominates(self, other):
         """Pareto dominance: True if self dominates other based on SU and CSR (MOGWO-1)."""
@@ -140,11 +139,12 @@ class ThesisOptimizerBase:
         return WolfContinuous(self.n, lambda_w=self.lambda_w, lambda_f=self.lambda_f,
                               lambda_b=self.lambda_b, lambda_a=self.lambda_a, rng=self.rng)
 
-    def _evaluate(self, w, apply_repair=False, compute_penalty=False):
+    def _evaluate(self, w, apply_repair=False, compute_penalty=False, use_smart_repair=False):
         w.decode_and_evaluate(self.items, self.container, apply_repair=apply_repair,
                               enforce_support=self.enforce_support,
                               enforce_fragility=self.enforce_fragility,
-                              compute_penalty=compute_penalty)
+                              compute_penalty=compute_penalty,
+                              use_smart_repair=use_smart_repair)
 
 class StandaloneDGWO(ThesisOptimizerBase):
     def run(self):
@@ -315,9 +315,13 @@ class StandaloneMOGWO(ThesisOptimizerBase):
         })
 
 class SequentialHybrid(StandaloneMOGWO):
+    def __init__(self, *args, seq_split=0.5, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.seq_split = seq_split
+
     def run(self):
         # Phase 1: DGWO for T1
-        T1 = self.max_iter // 2
+        T1 = int(self.max_iter * self.seq_split)
         pop = [self._new_wolf() for _ in range(self.pop_size)]
 
         for w in pop:
@@ -379,6 +383,10 @@ class SequentialHybrid(StandaloneMOGWO):
         })
 
 class RepairBasedHybrid(StandaloneMOGWO):
+    def __init__(self, *args, use_smart_repair=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.use_smart_repair = use_smart_repair
+
     def _note_repair(self, w):
         for k, v in w.last_repair.items():
             if k == 'rejections':
@@ -401,7 +409,7 @@ class RepairBasedHybrid(StandaloneMOGWO):
 
         for w in pop:
             # ONLY DIFFERENCE: apply_repair=True
-            self._evaluate(w, apply_repair=True)
+            self._evaluate(w, apply_repair=True, use_smart_repair=self.use_smart_repair)
             self._note_repair(w)
             self._update_archive(archive, w)
 
@@ -414,7 +422,7 @@ class RepairBasedHybrid(StandaloneMOGWO):
             for i in range(self.pop_size):
                 _update_position(pop[i], alpha_X, beta_X, delta_X, a, self.rng)
                 # Apply repair R1-R5 before evaluation
-                self._evaluate(pop[i], apply_repair=True)
+                self._evaluate(pop[i], apply_repair=True, use_smart_repair=self.use_smart_repair)
                 self._note_repair(pop[i])
                 self._update_archive(archive, pop[i])
 
