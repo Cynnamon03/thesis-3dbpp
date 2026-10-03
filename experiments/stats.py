@@ -265,6 +265,21 @@ def analyse(study):
                                 "max_sd": _f(np.max(sds)) if sds else 0.0,
                                 "per_instance": {str(inst): _f(sd) for inst, sd in zip(instances, sds)}}
 
+    # ── descriptives ─────────────────────────────────────────────────────────
+    def _desc(vals):
+        if not vals: return {"mean": None, "sd": None, "median": None, "min": None, "max": None, "n": 0}
+        return {"mean": _f(np.mean(vals)), "sd": _f(np.std(vals, ddof=1) if len(vals) > 1 else 0.0),
+                "median": _f(np.median(vals)), "min": _f(np.min(vals)), "max": _f(np.max(vals)), "n": len(vals)}
+
+    out["descriptives"] = {}
+    for measure_key in ["SU", "placed", "ET", "PM"]:
+        out["descriptives"][measure_key] = {c: _desc([x[measure_key] for x in rows if x["configuration"] == c]) for c in configs}
+    for m in COMPLIANCE_KEYS:
+        out["descriptives"][m] = {}
+        for d in COMPLIANCE_DEFS:
+            key = f"{m}_{d}"
+            out["descriptives"][m][d] = {c: _desc([x[key] for x in rows if x["configuration"] == c]) for c in configs}
+
     # ── SP1 ──────────────────────────────────────────────────────────────────
     sp1 = compare_rm(get_mat("SU"), configs, "SU")
     out["SP1"] = {"measure": "SU", "comparison": sp1,
@@ -284,7 +299,7 @@ def analyse(study):
             if d == "all_boxes":
                 per[m] = compare_rm(get_mat(f"{m}_{d}"), configs, m, enforced_note=note)
             else:
-                per[m] = {"measure": m, "label": MEASURE_LABELS.get(m, m), "note": "output descriptively only (RM testing is on all_boxes)"}
+                per[m] = {"measure": m, "label": MEASURE_LABELS.get(m, m), "note": "output descriptively only (RM testing is on all_boxes)", "omnibus": {"testable": False, "reason": "descriptive only - RM testing is on all boxes"}}
         if d == "all_boxes":
             raw = [per[m]["omnibus"]["p"] if per[m]["omnibus"].get("testable") else None for m in COMPLIANCE_KEYS]
             adj, fam = holm(raw)

@@ -74,36 +74,6 @@ export function DescriptivesTable({ stats, measures }) {
   );
 }
 
-export function NormalityTable({ stats, cmp, unitFmt }) {
-  const f = unitFmt || ((v) => fmt.num(v, 2));
-  return (
-    <div>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead><tr><th style={th}>Configuration</th><th style={th}>Average ± spread</th><th style={th}>Shapiro-Wilk W</th><th style={th}>p</th><th style={th}>Numbers look normal?</th></tr></thead>
-          <tbody>
-            {Object.entries(cmp.normality).map(([c, n]) => {
-              const d = cmp.descriptives[c] || {};
-              return (
-                <tr key={c}>
-                  <td style={{ ...td, fontWeight: 700 }}>{label(stats, c)}</td>
-                  <td style={td}>{f(d.mean)} ± {d.sd === null || d.sd === undefined ? "—" : f(d.sd)}</td>
-                  <td style={td}>{n.applicable ? fmt.num(n.W, 3) : "—"}</td>
-                  <td style={td}>{n.applicable ? fmt.p(n.p) : "—"}</td>
-                  <td style={{ ...td, color: n.applicable ? (n.normal ? "var(--green)" : "var(--amber)") : "var(--text-dim)" }}>
-                    {n.applicable ? (n.normal ? "Yes" : "No — rank-based tests") : `Not applicable — ${n.reason}`}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 10, lineHeight: 1.5 }}>{normalitySentence(cmp)}</p>
-    </div>
-  );
-}
-
 export function OmnibusCard({ cmp, measureCode, holm }) {
   const o = cmp.omnibus;
   const sig = holm ? o.significant_holm : o.significant;

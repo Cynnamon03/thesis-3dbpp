@@ -134,8 +134,8 @@ function ComplianceTable({ stats }) {
                     {DEFINITION_PLAIN[d]}{isPrimary && <span className="badge badge-primary" style={{ marginLeft: 6 }}>primary</span>}
                   </td>
                   {configs.map((c) => <td key={c} style={{ ...td, fontWeight: isPrimary ? 700 : 500 }}>{fmt.pct(stats.descriptives[m][d][c].mean, 2)}</td>)}
-                  <td style={{ ...td, fontSize: 12, color: o.testable ? (o.significant_holm ? "var(--green)" : "var(--text-muted)") : "var(--text-dim)" }}>
-                    {o.testable ? (o.significant_holm ? `Yes (Holm ${fmt.peq(o.p_holm)})` : `No (Holm ${fmt.peq(o.p_holm)})`) : o.reason}
+                  <td style={{ ...td, fontSize: 12, color: (o && o.testable) ? (o.significant_holm ? "var(--green)" : "var(--text-muted)") : "var(--text-dim)" }}>
+                    {(o && o.testable) ? (o.significant_holm ? `Yes (Holm ${fmt.peq(o.p_holm)})` : `No (Holm ${fmt.peq(o.p_holm)})`) : (o ? o.reason : "N/A")}
                   </td>
                 </tr>
               );

@@ -3,7 +3,7 @@
 // block, plus a side-by-side view of saved single runs.
 import React, { useState, useMemo } from "react";
 import CustomLoadBanner, { customLoadOf, CustomLoadBadge, CUSTOM_LOAD_LABEL } from "../components/CustomLoadBanner";
-import { Section, Empty, DescriptivesTable, NormalityTable, OmnibusCard, PairsTable, ConfoundNote, cell, ConfigName } from "./StatsTables";
+import { Section, Empty, DescriptivesTable, OmnibusCard, PairsTable, ConfoundNote, cell, ConfigName } from "./StatsTables";
 import { ProvenanceStrip } from "./StudyResults";
 import LineChart from "./LineChart";
 import { fmt, label, sp1Summary, sp2Summary, sp3Summary, compositeSummary, MEASURE_PLAIN, DEFINITION_PLAIN } from "./verdicts";
@@ -23,9 +23,6 @@ function SP1({ stats }) {
           { code: "SU", label: "Container full (%)", get: (s, c) => s.descriptives.SU[c] },
           { code: "placed", label: "Boxes placed", get: (s, c) => s.descriptives.placed[c], fmt: (v) => fmt.num(v, 1) },
         ]} />
-      </Section>
-      <Section title="Do the numbers look normal?" desc="A quick check that decides which family of tests is appropriate.">
-        <NormalityTable stats={stats} cmp={cmp} />
       </Section>
       <Section title="Are any of the differences real?" desc="One test asks whether there is any difference at all between the four methods.">
         <OmnibusCard cmp={cmp} measureCode="SU" />
@@ -81,7 +78,6 @@ function SP2({ stats }) {
         <DescriptivesTable stats={{ ...stats, descriptives: stats.descriptives }} measures={[
           { code: measure, label: `${MEASURE_PLAIN[measure]} (%)`, get: (s, c) => s.descriptives[measure][def][c] },
         ]} />
-        <div style={{ marginTop: 16 }}><NormalityTable stats={stats} cmp={cmp} /></div>
         <div style={{ marginTop: 16 }}><OmnibusCard cmp={cmp} measureCode={measure} holm /></div>
         <div style={{ marginTop: 16 }}><PairsTable stats={stats} cmp={cmp} measureCode={measure} /></div>
       </Section>
@@ -132,9 +128,6 @@ function SP3({ stats, study }) {
           { code: "ET", label: "Time (s)", get: (s, c) => s.descriptives.ET[c], fmt: (v) => (v === null || v === undefined ? "—" : (v / 1000).toFixed(2)) },
           { code: "PM", label: "Peak memory (MB)", get: (s, c) => s.descriptives.PM[c], fmt: (v) => fmt.num(v, 1) },
         ]} />
-      </Section>
-      <Section title={`Do the numbers look normal? — ${MEASURE_PLAIN[metric]}`}>
-        <NormalityTable stats={stats} cmp={cmp} unitFmt={(v) => (metric === "ET" ? (v / 1000).toFixed(2) : fmt.num(v, 1))} />
       </Section>
       <Section title="Are any of the differences real?" desc="Holm-corrected across the two metrics (time, memory).">
         <OmnibusCard cmp={cmp} measureCode={metric} holm />
